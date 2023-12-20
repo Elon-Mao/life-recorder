@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import AppFooter from '@/components/AppFooter.vue'
 </script>
 
 <template>
   <RouterView />
-  <h1>Home</h1>
+  <app-footer></app-footer>
 </template>
 
 <style scoped>

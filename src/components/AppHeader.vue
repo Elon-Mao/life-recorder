@@ -23,7 +23,10 @@ onAuthStateChanged(auth, (user) => {
       <popover v-model:show="showUserPop" placement="bottom-end">
         <div class="user-pop">
           <template v-if="userStore.user">
-            <span>{{ userStore.user.displayName }}</span>
+            <div>
+              <icon name="user-circle-o" size="1.5rem" />
+              <span>{{ userStore.user.displayName }}</span>
+            </div>
             <span class="pop-button" @click="signOut(auth)">Logout</span>
           </template>
           <span v-else class="pop-button" @click="signInWithPopup(auth, provider)">Sign In With Google</span>
@@ -49,6 +52,14 @@ onAuthStateChanged(auth, (user) => {
   flex-direction: column;
 }
 
+.user-pop>div {
+  height: 2rem;
+  display: flex;
+  align-items: flex-end;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
 .user-pop>span {
   padding: 0.5rem 1rem;
 }
@@ -68,5 +79,6 @@ onAuthStateChanged(auth, (user) => {
   background-color: rgb(114, 50, 221);
   font-size: 1.5rem;
   line-height: 2rem;
+  color: white;
 }
 </style>
