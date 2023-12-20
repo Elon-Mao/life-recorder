@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { NavBar, Icon, Popover } from 'vant'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, provider } from '@/config/firebase'
 
 const showUserPop = ref(false)
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 onAuthStateChanged(auth, (user) => {
   showUserPop.value = false
   userStore.setUser(user)
+  router.push('/')
 })
 </script>
 

@@ -14,10 +14,7 @@ import AppHeader from '@/components/AppHeader.vue'
   </div>
   <HelloWorld msg="Vite + Vue" /> -->
   <app-header></app-header>
-  <div style="width: 10px;height: 2000px;">
-
-  </div>
-  <app-header></app-header>
+  <RouterView />
 </template>
 
 <style scoped>
