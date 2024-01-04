@@ -16,21 +16,21 @@ const router = createRouter({
   }, {
     path: '/home',
     name: 'Home',
-    redirect: '/home/today',
+    redirect: '/home/record',
     component: () => import('@/views/Home.vue'),
     children: [{
-      path: 'today',
-      name: 'Today',
-      component: () => import('@/views/Today.vue'),
+      path: 'record',
+      name: 'Record',
+      component: () => import('@/views/Record.vue'),
       meta: {
-        title: 'Today'
+        title: 'Record'
       }
     }, {
-      path: 'event',
-      name: 'Event',
-      component: () => import('@/views/Event.vue'),
+      path: 'label',
+      name: 'Label',
+      component: () => import('@/views/Label.vue'),
       meta: {
-        title: 'Event'
+        title: 'Label'
       }
     }, {
       path: 'analysis',
@@ -49,7 +49,7 @@ declare module 'vue-router' {
   }
 }
 
-router.beforeEach(to => {
+router.beforeEach((to) => {
   if (to.name !== 'Portal') {
     const userStore = useUserStore()
     if (!userStore.user) {
@@ -60,7 +60,7 @@ router.beforeEach(to => {
   }
 })
 
-router.afterEach(to => {
+router.afterEach((to) => {
   document.title = to.meta.title
 })
 

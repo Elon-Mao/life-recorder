@@ -2,7 +2,7 @@
 </script>
 
 <template>
-  <h1>Event</h1>
+  <h1>Record</h1>
 </template>
 
 <style scoped>

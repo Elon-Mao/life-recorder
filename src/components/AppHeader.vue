@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NavBar, Icon, Popover } from 'vant'
+import {
+  NavBar as VanNavBar,
+  Icon as VanIcon,
+  Popover as VanPopover
+} from 'vant'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
@@ -18,13 +22,13 @@ onAuthStateChanged(auth, (user) => {
 </script>
 
 <template>
-  <nav-bar :title="route.meta.title" class="app-header">
+  <van-nav-bar :title="route.meta.title">
     <template #right>
-      <popover v-model:show="showUserPop" placement="bottom-end">
+      <van-popover v-model:show="showUserPop" placement="bottom-end">
         <div class="user-pop">
           <template v-if="userStore.user">
             <div>
-              <icon name="user-circle-o" size="1.5rem" />
+              <van-icon name="user-circle-o" size="1.5rem" />
               <span>{{ userStore.user.displayName }}</span>
             </div>
             <span class="pop-button" @click="signOut(auth)">Logout</span>
@@ -33,19 +37,14 @@ onAuthStateChanged(auth, (user) => {
         </div>
         <template #reference>
           <div v-if="userStore.user" class="user-avatar">{{ (userStore.user.displayName || '?')[0] }}</div>
-          <icon v-else name="user-circle-o" size="2rem" />
+          <van-icon v-else name="user-circle-o" size="2rem" />
         </template>
-      </popover>
+      </van-popover>
     </template>
-  </nav-bar>
+  </van-nav-bar>
 </template>
 
 <style scoped>
-.app-header {
-  position: sticky;
-  top: 0;
-}
-
 .user-pop {
   white-space: nowrap;
   display: flex;

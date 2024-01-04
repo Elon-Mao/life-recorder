@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Tabbar, TabbarItem } from 'vant'
+import {
+  Tabbar as VanTabbar,
+  TabbarItem as VanTabbarItem
+} from 'vant'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,11 +15,11 @@ const active = computed({
 </script>
 
 <template>
-  <tabbar v-model="active">
-    <tabbar-item name="Today" icon="home-o">Today</tabbar-item>
-    <tabbar-item name="Event" icon="search">Event</tabbar-item>
-    <tabbar-item name="Analysis" icon="friends-o">Analysis</tabbar-item>
-  </tabbar>
+  <van-tabbar v-model="active" :fixed="false">
+    <van-tabbar-item name="Record" icon="records-o">Record</van-tabbar-item>
+    <van-tabbar-item name="Label" icon="cluster-o">Label</van-tabbar-item>
+    <van-tabbar-item name="Analysis" icon="chart-trending-o">Analysis</van-tabbar-item>
+  </van-tabbar>
 </template>
 
 <style scoped></style>
