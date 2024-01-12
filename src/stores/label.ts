@@ -13,7 +13,7 @@ export const useLabelStore = defineStore('label', {
         name: 'Study English'
       }, {
         id: '2',
-        name: 'Code'
+        name: 'Code111111111111111111111111111111111111111111111111111111111111111111111111'
       }, {
         id: '3',
         name: 'Exercise'
@@ -57,10 +57,6 @@ export const useLabelStore = defineStore('label', {
     }
   },
   actions: {
-    // setUser(user: User | null) {
-    //   this.user = user
-    //   localStorage.setItem('user', JSON.stringify(user))
-    // }
     rename(index: number, newName: string) {
       this.labels[index].name = newName
     },

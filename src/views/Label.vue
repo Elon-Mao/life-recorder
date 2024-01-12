@@ -1,20 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   Icon as VanIcon,
   Cell as VanCell,
   ActionSheet as VanActionSheet,
   Dialog as VanDialog,
   Form as VanForm,
-  Field as VanField
+  Field as VanField,
+  TextEllipsis as VanTextEllipsis
 } from 'vant'
 import { useLabelStore } from '@/stores/label'
-import { computed } from 'vue'
-
-interface LabelAction {
-  name: string
-  execute: () => void
-}
+import VanAction from '@/types/VanAction'
 
 const labelStore = useLabelStore()
 
@@ -26,7 +22,7 @@ const showLabelEditor = () => {
 const showAction = ref(false)
 const showEditor = ref(false)
 const labelForm = ref()
-const actions: LabelAction[] = [{
+const actions: VanAction[] = [{
   name: 'rename',
   execute: () => {
     editingName.value = labelStore.labels[editingIndex.value].name
@@ -38,7 +34,7 @@ const actions: LabelAction[] = [{
 
   }
 }]
-const onSelect = (item: LabelAction) => {
+const onSelect = (item: VanAction) => {
   showAction.value = false
   item.execute()
 }
@@ -85,18 +81,30 @@ const uniqueValidator = () => {
 </script>
 
 <template>
-  <van-cell v-for="(label, index) in labelStore.labels" :key="label.id" is-link :title="label.name" @click="labelOnClick(index)" />
+  <div class="label-list">
+    <van-cell v-for="(label, index) in labelStore.labels" :key="label.id" is-link
+      @click="labelOnClick(index)">
+      <template #title>
+        <van-text-ellipsis :content="label.name" />
+      </template>
+    </van-cell>
+  </div>
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onSelect" />
   <van-icon name="add" color="#1989fa" size="3rem" class="add-label-icon" @click="addLable" />
   <van-dialog v-model:show="showEditor" :title="editingTitle" show-cancel-button :before-close="beforeClose">
     <van-form ref="labelForm">
-      <van-field v-model="editingName" name="label" placeholder="label name"
-          :rules="[{ required: true, message: 'not empty' }, { validator: uniqueValidator, message: 'name repeat' }]" />
+      <van-field v-model="editingName" placeholder="label name"
+        :rules="[{ required: true, message: 'not empty' }, { validator: uniqueValidator, message: 'name repeat' }]" />
     </van-form>
   </van-dialog>
 </template>
 
 <style scoped>
+.label-list {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .add-label-icon {
   position: fixed;
   bottom: 70px;

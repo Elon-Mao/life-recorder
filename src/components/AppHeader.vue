@@ -72,12 +72,12 @@ onAuthStateChanged(auth, (user) => {
 }
 
 .user-avatar {
-  width: 2rem;
-  height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
   background-color: rgb(114, 50, 221);
-  font-size: 1.5rem;
-  line-height: 2rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
   color: white;
 }
 </style>

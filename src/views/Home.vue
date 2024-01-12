@@ -6,12 +6,16 @@ import AppFooter from '@/components/AppFooter.vue'
   <div class="app-main">
     <RouterView/>
   </div>
-  <app-footer></app-footer>
+  <app-footer class="app-footer"></app-footer>
 </template>
 
 <style scoped>
 .app-main {
   flex-grow: 1;
-  overflow-y: auto;
+  height: 0;
+}
+
+.app-footer {
+  flex-shrink: 0;
 }
 </style>
