@@ -1,70 +1,60 @@
 import { defineStore } from 'pinia'
+import { updateDoc, DocumentData } from 'firebase/firestore'
+import { customAsync } from '@/config/customAsync'
+import { useUserStore } from '@/stores/user'
 
 export interface Label {
   id: string
   name: string
+  recordNum: number
+}
+
+const saveLabels = async (labels: Label[], labelMaxId: number) => {
+  await customAsync(() => {
+    updateDoc(useUserStore().userDoc!, {
+      labels: labels.map((label) => `${label.id},${label.name},${label.recordNum}`).join('\n'),
+      labelMaxId
+    })
+  })
 }
 
 export const useLabelStore = defineStore('label', {
   state: () => {
     return {
-      labels: [{
-        id: '1',
-        name: 'Study English'
-      }, {
-        id: '2',
-        name: 'Code111111111111111111111111111111111111111111111111111111111111111111111111'
-      }, {
-        id: '3',
-        name: 'Exercise'
-      }, {
-        id: '4',
-        name: 'Exercise2'
-      }, {
-        id: '5',
-        name: 'Exercise3'
-      }, {
-        id: '6',
-        name: 'Exercise4'
-      }, {
-        id: '7',
-        name: 'Exercise5'
-      }, {
-        id: '8',
-        name: 'Exercise6'
-      }, {
-        id: '9',
-        name: 'Exercise7'
-      }, {
-        id: '10',
-        name: 'Exercise8'
-      }, {
-        id: '11',
-        name: 'Exercise9'
-      }, {
-        id: '12',
-        name: 'Exercise10'
-      }, {
-        id: '13',
-        name: 'Exercise11'
-      }, {
-        id: '14',
-        name: 'Exercise12'
-      }, {
-        id: '15',
-        name: 'Exercise13'
-      }] as Label[]
+      labels: [] as Label[],
+      labelMaxId: 0
     }
   },
   actions: {
-    rename(index: number, newName: string) {
-      this.labels[index].name = newName
-    },
-    addLabel(labelName: string) {
-      this.labels.unshift({
-        id: '123',
-        name: labelName
+    setByDoc(doc: DocumentData) {
+      this.labels = doc.labels.split('\n').map((labelStr: string) => {
+        const [id, name, recordNum] = labelStr.split(',')
+        return {
+          id, name,
+          recordNum: Number(recordNum)
+        }
       })
+      this.labelMaxId = doc.labelMaxId
+    },
+    async rename(index: number, newName: string) {
+      const newLabels = [...this.labels]
+      newLabels[index].name = newName
+      await saveLabels(newLabels, this.labelMaxId)
+    },
+    async addLabel(labelName: string) {
+      const newLabels = [...this.labels]
+      const newId = this.labelMaxId + 1
+      newLabels.unshift({
+        id: newId + '',
+        name: labelName,
+        recordNum: 0
+      })
+      await saveLabels(newLabels, newId)
+    },
+    async deleteLabel(index: number) {
+      const newLabels = [...this.labels]
+      newLabels.splice(index, 1)
+      await saveLabels(newLabels, this.labelMaxId)
     }
   },
 })

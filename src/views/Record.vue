@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import {
   Cell as VanCell,
   Button as VanButton,
-  Divider as VanDivider,
   TextEllipsis as VanTextEllipsis,
   Popup as VanPopup,
   PickerGroup as VanPickerGroup,
@@ -12,9 +11,9 @@ import {
   Field as VanField,
   RadioGroup as VanRadioGroup,
   Radio as VanRadio,
-  Overlay as VanOverlay,
-  Loading as VanLoading,
-  showNotify
+  ActionSheet as VanActionSheet,
+  showNotify,
+  showConfirmDialog
 } from 'vant'
 import { useRecordStore, Record } from '@/stores/record'
 import { useLabelStore } from '@/stores/label'
@@ -23,98 +22,102 @@ import VanAction from '@/types/VanAction'
 const recordStore = useRecordStore()
 const labelStore = useLabelStore()
 
-const editingIndex = ref(0)
-const editingRecord = ref<{
-  [key in keyof Record]?: Record[key]
-}>({})
-const minTime = ref('')
-const maxTime = ref('')
+const editingIndex = ref(Infinity)
+const editingRecord = ref<Record>({})
 const showPickerGroup = ref(false)
 
 const actions: VanAction[] = [{
-  name: 'edit',
+  name: 'End now',
   execute: () => {
 
   }
 }, {
-  name: 'delete',
+  name: 'Edit',
   execute: () => {
-
+    editingRecord.value = {
+      ...recordStore.records[editingIndex.value]
+    }
+    showAction.value = false
+    showPickerGroup.value = true
   }
+}, {
+  name: 'Delete',
+  execute: async () => {
+    await showConfirmDialog({
+      message: 'Data will not be recovered'
+    })
+    try {
+      await recordStore.deleteRecord(editingIndex.value)
+      showAction.value = false
+    } catch { }
+  },
+  color: '#ee0a24'
 }]
-
-const currentActions: VanAction[] = [{
-  name: 'end now',
-  execute: () => {
-
-  }
-}, ...actions]
+const onActionSelect = (item: VanAction) => {
+  item.execute()
+}
 
 const showAction = ref(false)
 
 const recordOnClick = (index: number) => {
   editingIndex.value = index
-  editingRecord.value = {}
-  // editingTime.value = recordStore.records[index].startTime.split(':')
-  // minTime.value = index < recordStore.records.length - 1 ? recordStore.records[index + 1].endTime! : '00:00'
-  // maxTime.value = index > 0 ? recordStore.records[index - 1].startTime! : '23:59'
-  // showTimePicker.value = true
   showAction.value = true
 }
 
 const addRecord = () => {
+  editingIndex.value = Infinity
+  const newRecord: Record = {}
+  newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
+  editingRecord.value = newRecord
   showPickerGroup.value = true
 }
 
 const addMode = ref('start now')
 
-const pickerTabs = computed(() => addMode.value === 'start now' ? ['label'] : ['label', 'start time', 'end time'])
+const isStartMode = () => {
+  return editingIndex.value === Infinity && addMode.value === 'start now'
+}
 
-const recordRemark = ref('')
+const pickerTabs = computed(() => {
+  if (isStartMode()) {
+    return ['label']
+  }
+  return ['label', 'start time', 'end time']
+})
 
 const getCurrentTimeParts = () => {
   const currentDate = new Date()
   return [currentDate.getHours() + '', currentDate.getMinutes() + '']
 }
 
-const addConfirm = async (selectGroups: any[]) => {
-  const [startTimeParts, endTimeParts] = selectGroups.length === 3 ?
-    [selectGroups[1].selectedValues, selectGroups[2].selectedValues] : (() => {
-      const result = getCurrentTimeParts()
-      return [result, result]
-    })()
-  const newRecord = {
-    labelId: selectGroups[0].selectedValues[0],
-    startTime: startTimeParts.join(':'),
-    endTime: endTimeParts.join(':'),
-    startTimeParts,
-    endTimeParts,
+const onRecordConfirm = async () => {
+  const newRecord = editingRecord.value
+  if (isStartMode()) {
+    newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
   }
+  newRecord.startTime = newRecord.startTimeParts!.join(':')
+  newRecord.endTime = newRecord.endTimeParts!.join(':')
   if (newRecord.startTime > newRecord.endTime) {
     showNotify('End time cannot be earlier than start time')
     return
   }
-  showLoading.value = true
+
+  newRecord.labelId = newRecord.labelPicker![0]
   try {
-    const result = await recordStore.addRecord(newRecord)
+    const result = await recordStore.addRecord(newRecord, editingIndex.value)
     if (result) {
       showPickerGroup.value = false
       showNotify({ type: 'success', message: 'add success' })
     } else {
       showNotify('time conflict')
     }
-  } catch(e) {
-
-  }
-  showLoading.value = false
+  } catch { }
 }
-
-const showLoading = ref(false)
 </script>
 
 <template>
   <div class="record-container">
-    <van-cell class="van-contact-card" is-link center @click="addRecord">
+    <van-cell class="van-contact-card" is-link center size="large" @click="addRecord">
       <template #title>
         <div class="add-record-wrapper">
           <van-button icon="plus" type="primary" size="small" />
@@ -125,44 +128,34 @@ const showLoading = ref(false)
     <van-cell v-for="(record, index) in recordStore.records" is-link center @click="recordOnClick(index)">
       <template #title>
         <van-text-ellipsis :content="record.labelName" />
-        <span>{{ `${record.startTime}~${record.endTime} ${record.span}minutes` }}</span>
+      </template>
+      <template #label>
+        <div class="span-info">
+          <span>{{ `${record.startTime}~${record.endTime}` }}</span>
+          <span>{{ `${record.span}minutes` }}</span>
+        </div>
+        <span>{{ record.remark }}</span>
       </template>
     </van-cell>
   </div>
-  <van-action-sheet v-model:show="showAction" :actions="actions" @select="onSelect" />
-  <!-- <div class="record-container">
-    <div class="record-border">label</div>
-    <div class="record-border">start time</div>
-    <div class="record-border">end time</div>
-    <div class="record-cell">minutes</div>
-    <template v-for="record in recordStore.records">
-      <div class="record-cell">Study English</div>
-      <div class="record-cell">
-        <van-field v-model="record.startTime" readonly placeholder="select time" @click="editStartTime" />
-      </div>
-      <div class="record-cell">Content 3</div>
-      <div class="record-cell">Content 3</div>
-    </template>
-  </div> -->
+  <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
     <van-picker-group :tabs="pickerTabs" next-step-text="Next Step" @cancel="showPickerGroup = false"
-      @confirm="addConfirm">
-      <template #title>
+      @confirm="onRecordConfirm">
+      <template #title v-if="editingIndex === Infinity">
         <van-radio-group v-model="addMode" direction="horizontal" class="add-mode-wrapper">
           <van-radio name="start now">start now</van-radio>
           <van-radio name="import">import</van-radio>
         </van-radio-group>
       </template>
-      <van-picker :visible-option-num="3" :columns="labelStore.labels"
+      <van-picker v-model="editingRecord.labelPicker" :visible-option-num="3" :columns="labelStore.labels"
         :columns-field-names="{ text: 'name', value: 'id' }" />
-      <van-time-picker :visible-option-num="3" />
-      <van-time-picker :visible-option-num="3" />
+      <van-time-picker v-model="editingRecord.startTimeParts" :visible-option-num="3" />
+      <van-time-picker v-model="editingRecord.endTimeParts" :visible-option-num="3" />
     </van-picker-group>
-    <van-field v-model="recordRemark" placeholder="Input Remark" class="record-remark" />
+    <van-field v-model="editingRecord.remark" label-align="top" label="Remark:" placeholder="input remark" maxlength="50"
+      type="textarea" show-word-limit />
   </van-popup>
-  <van-overlay :show="showLoading">
-    <van-loading type="spinner" />
-  </van-overlay>
 </template>
 
 <style scoped>
@@ -170,13 +163,6 @@ const showLoading = ref(false)
   height: 100%;
   overflow-y: auto;
 }
-
-/* .add-record-cell::after {
-  background: repeating-linear-gradient(315deg, var(--van-warning-color)0, var(--van-warning-color)20%, transparent 0, transparent 25%, var(--van-primary-color)0, var(--van-primary-color)45%, transparent 0, transparent 50%);
-  background-size: 80px;
-  content: "";
-  border-bottom: 1px solid var(--van-cell-border-color);
-} */
 
 .add-record-wrapper {
   display: flex;
@@ -187,18 +173,11 @@ const showLoading = ref(false)
   margin-left: 0.5rem;
 }
 
-/* .record-container {
-  display: grid;
-  justify-items: center;
-  align-items: center;
-  grid-template-columns: 1fr auto auto auto;
-  grid-template-rows: repeat(auto-fill, minmax(50px, 1fr));
-  gap: 1px;
-} */
-
-/* .record-container>div {
-  background-color: lightblue;
-} */
+.span-info {
+  width: 8.3rem;
+  display: flex;
+  justify-content: space-between;
+}
 
 .add-mode-wrapper {
   position: absolute;
@@ -206,9 +185,5 @@ const showLoading = ref(false)
   transform: translateX(-50%);
   flex-wrap: nowrap;
   text-wrap: nowrap;
-}
-
-.record-remark {
-  margin: 1rem 0;
 }
 </style>

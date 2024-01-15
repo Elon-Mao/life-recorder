@@ -1,6 +1,13 @@
 <script setup lang="ts">
-// import HelloWorld from './components/HelloWorld.vue'
+import {
+  Overlay as VanOverlay,
+  Loading as VanLoading
+} from 'vant'
 import AppHeader from '@/components/AppHeader.vue'
+import { useSystemStore } from '@/stores/system'
+
+const systemStore = useSystemStore()
+
 </script>
 
 <template>
@@ -15,6 +22,11 @@ import AppHeader from '@/components/AppHeader.vue'
   <HelloWorld msg="Vite + Vue" /> -->
   <app-header></app-header>
   <RouterView />
+  <van-overlay :show="systemStore.loading">
+    <div class="loading-wrapper">
+      <van-loading type="spinner" />
+    </div>
+  </van-overlay>
 </template>
 
 <style scoped>
@@ -30,4 +42,10 @@ import AppHeader from '@/components/AppHeader.vue'
 .logo.vue:hover {
   filter: drop-shadow(0 0 2em #42b883aa);
 } */
+.loading-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
 </style>

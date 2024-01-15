@@ -7,12 +7,14 @@ interface RecordData {
   labelId: string
   startTime: string
   endTime: string
+  remark: string
 }
 
 export interface Record extends Partial<RecordData> {
   labelName?: string
-  startTimeParts: string[]
-  endTimeParts: string[]
+  labelPicker?: string[]
+  startTimeParts?: string[]
+  endTimeParts?: string[]
   span?: number
 }
 
@@ -21,14 +23,15 @@ const calculateLabelName = (record: Record) => {
 }
 
 const calculateSpan = (record: Record) => {
-  const startTimeMinutes = Number(record.startTimeParts[0]) * 60 + Number(record.startTimeParts[1])
-  const endTimeMinutes = Number(record.endTimeParts[0]) * 60 + Number(record.endTimeParts[1])
+  const startTimeMinutes = Number(record.startTimeParts![0]) * 60 + Number(record.startTimeParts![1])
+  const endTimeMinutes = Number(record.endTimeParts![0]) * 60 + Number(record.endTimeParts![1])
   record.span = endTimeMinutes - startTimeMinutes
 }
 
 const convertToRecord = (recordData: RecordData): Record => {
   const record = {
     ...recordData,
+    labelPicker: [recordData.labelId],
     startTimeParts: recordData.startTime.split(':'),
     endTimeParts: recordData.endTime.split(':')
   }
@@ -55,60 +58,76 @@ const addRecord = (records: Record[], newRecord: Record) => {
 
 export const useRecordStore = defineStore('record', {
   state: () => {
+    // return {
+    //   records: [{
+    //     labelId: '1',
+    //     startTime: '18:04',
+    //     endTime: '20:05',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '18:03',
+    //     endTime: '18:04',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '18:02',
+    //     endTime: '18:03',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '18:01',
+    //     endTime: '18:02',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '18:00',
+    //     endTime: '18:01',
+    //     remark: ''
+    //   }, {
+    //     labelId: '3',
+    //     startTime: '11:00',
+    //     endTime: '11:30',
+    //     remark: ''
+    //   }, {
+    //     labelId: '2',
+    //     startTime: '10:00',
+    //     endTime: '10:45',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '09:30',
+    //     endTime: '10:00',
+    //     remark: ''
+    //   }, {
+    //     labelId: '1',
+    //     startTime: '09:00',
+    //     endTime: '09:30',
+    //     remark: ''
+    //   }].map(convertToRecord)
+    // }
     return {
-      records: [{
-        labelId: '1',
-        startTime: '18:04',
-        endTime: '20:05'
-      }, {
-        labelId: '1',
-        startTime: '18:03',
-        endTime: '18:04'
-      }, {
-        labelId: '1',
-        startTime: '18:02',
-        endTime: '18:03'
-      }, {
-        labelId: '1',
-        startTime: '18:01',
-        endTime: '18:02'
-      }, {
-        labelId: '1',
-        startTime: '18:00',
-        endTime: '18:01'
-      }, {
-        labelId: '3',
-        startTime: '11:00',
-        endTime: '11:30'
-      }, {
-        labelId: '2',
-        startTime: '10:00',
-        endTime: '10:45'
-      }, {
-        labelId: '1',
-        startTime: '09:30',
-        endTime: '10:00'
-      }, {
-        labelId: '1',
-        startTime: '09:00',
-        endTime: '09:30'
-      }].map(convertToRecord)
+      records: [] as Record[]
     }
   },
   actions: {
-    addRecord(newRecord: Record, index = Infinity) {
+    async addRecord(newRecord: Record, index = Infinity) {
       const newRecords = [...this.records]
       newRecords.splice(index, 1)
       if (!addRecord(newRecords, newRecord)) {
-        return Promise.resolve(false)
+        return false
       }
-      return new Promise((resolve, reject) => {
-        // fetch()
-        calculateLabelName(newRecord)
-        calculateSpan(newRecord)
-        this.records = newRecords
-        resolve(true)
-      })
+      // fetch()
+      calculateLabelName(newRecord)
+      calculateSpan(newRecord)
+      this.records = newRecords
+      return true
+    },
+    async deleteRecord(index: number) {
+      const newRecords = [...this.records]
+      newRecords.splice(index, 1)
+      // fetch()
+      this.records = newRecords
     }
   },
 })
