@@ -7,7 +7,6 @@ import AppHeader from '@/components/AppHeader.vue'
 import { useSystemStore } from '@/stores/system'
 
 const systemStore = useSystemStore()
-
 </script>
 
 <template>

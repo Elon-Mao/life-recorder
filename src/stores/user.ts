@@ -1,37 +1,46 @@
 import { defineStore } from 'pinia'
 import { User } from 'firebase/auth'
 import { auth, db } from '@/config/firebase'
-import { customAsync } from '@/config/customAsync'
-import { doc, getDoc, setDoc, onSnapshot, DocumentData, DocumentReference } from 'firebase/firestore'
+import { customAsync } from '@/common/customPromise'
+import { doc, getDoc, setDoc, onSnapshot, DocumentReference, collection, CollectionReference } from 'firebase/firestore'
 import { useLabelStore } from '@/stores/label'
+import { useSystemStore } from '@/stores/system'
+import router from '@/router'
 
-type userDoc = DocumentReference<DocumentData, DocumentData> | null
+type UserDoc = DocumentReference | null
+type RecordsCollection = CollectionReference | null
 
 export const useUserStore = defineStore('user', {
   state: () => {
     const userString = localStorage.getItem('user')
     return {
       user: userString ? JSON.parse(userString) : auth.currentUser,
-      userDoc: null as userDoc,
+      userDoc: null as UserDoc,
+      recordsCollection: null as RecordsCollection
     }
   },
   actions: {
     async setUser(user: User | null) {
       const success = () => {
         this.user = user
-        localStorage.setItem('user', JSON.stringify(user))
         this.userDoc = userDoc
+        this.recordsCollection = recordsCollection
+        useSystemStore().setLoading(false)
       }
 
-      let userDoc: userDoc = null
+      let userDoc: UserDoc = null
+      let recordsCollection: RecordsCollection = null
       if (!user) {
+        localStorage.removeItem('user')
+        router.push({ name: 'Portal'})
         success()
         return
       }
       userDoc = doc(db, 'users', user.uid)
+      recordsCollection = collection(userDoc, 'records')
       const labelStore = useLabelStore()
-      onSnapshot(userDoc, (doc) => {
-        labelStore.setByDoc(doc.data()!)
+      onSnapshot(userDoc, (newDoc) => {
+        labelStore.setByDoc(newDoc.data()!)
       })
 
       await customAsync(async () => {
@@ -43,6 +52,8 @@ export const useUserStore = defineStore('user', {
           }, { merge: true })
         }
       })
+      localStorage.setItem('user', JSON.stringify(user))
+      router.push({ name: 'Record'})
       success()
     }
   },

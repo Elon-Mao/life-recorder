@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
+  NavBar as VanNavBar,
+  Calendar as VanCalendar,
   Cell as VanCell,
   Button as VanButton,
   TextEllipsis as VanTextEllipsis,
@@ -15,10 +17,12 @@ import {
   showNotify,
   showConfirmDialog
 } from 'vant'
+import { useUserStore } from '@/stores/user'
 import { useRecordStore, Record } from '@/stores/record'
 import { useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 
+const userStore = useUserStore()
 const recordStore = useRecordStore()
 const labelStore = useLabelStore()
 
@@ -68,6 +72,7 @@ const addRecord = () => {
   editingIndex.value = Infinity
   const newRecord: Record = {}
   newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
+  newRecord.remark = ''
   editingRecord.value = newRecord
   showPickerGroup.value = true
 }
@@ -113,10 +118,44 @@ const onRecordConfirm = async () => {
     }
   } catch { }
 }
+
+const addRecordDate = (addNum: number) => {
+  const newDate = new Date(recordsDate.value)
+  newDate.setDate(newDate.getDate() + addNum)
+  recordsDate.value = newDate
+}
+const lastDay = () => {
+  addRecordDate(-1)
+}
+const nextDay = () => {
+  addRecordDate(1)
+}
+
+const showCalendar = ref(false)
+let recordsDate = ref(new Date())
+const recordsDateStr = computed(() => `${recordsDate.value.getFullYear()}/${String(recordsDate.value.getMonth() + 1).padStart(2, '0')}/${recordsDate.value.getDate()}`)
+const onDateConfirm = (value: Date) => {
+  recordsDate.value = value
+  showCalendar.value = false
+}
+const getRecords = () => {
+  if (userStore.recordsCollection) {
+    recordStore.getRecords(recordsDateStr.value)
+  }
+}
+watch(recordsDateStr, getRecords)
+watch(() => userStore.recordsCollection, getRecords)
 </script>
 
 <template>
   <div class="record-container">
+    <van-nav-bar left-text="Last Day" right-text="Next Day" @click-left="lastDay" @click-right="nextDay">
+      <template #title>
+        <van-button icon="calendar-o" @click="showCalendar = true">
+          {{ recordsDateStr }}
+        </van-button>
+      </template>
+    </van-nav-bar>
     <van-cell class="van-contact-card" is-link center size="large" @click="addRecord">
       <template #title>
         <div class="add-record-wrapper">
@@ -138,10 +177,11 @@ const onRecordConfirm = async () => {
       </template>
     </van-cell>
   </div>
+  <van-calendar v-model:show="showCalendar" :round="false" position="top" :min-date="new Date('2023/01/01')"
+    @confirm="onDateConfirm" />
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
-    <van-picker-group :tabs="pickerTabs" next-step-text="Next Step" @cancel="showPickerGroup = false"
-      @confirm="onRecordConfirm">
+    <van-picker-group :tabs="pickerTabs" @cancel="showPickerGroup = false" @confirm="onRecordConfirm">
       <template #title v-if="editingIndex === Infinity">
         <van-radio-group v-model="addMode" direction="horizontal" class="add-mode-wrapper">
           <van-radio name="start now">start now</van-radio>

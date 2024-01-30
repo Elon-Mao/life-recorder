@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 
+let loadingTimeoutId: NodeJS.Timeout
+
 export const useSystemStore = defineStore('system', {
   state: () => {
     return {
@@ -8,7 +10,14 @@ export const useSystemStore = defineStore('system', {
   },
   actions: {
     setLoading(loading: boolean) {
-      this.loading = loading
+      if (loading) {
+        this.loading = loading
+        return
+      }
+      clearTimeout(loadingTimeoutId)
+      loadingTimeoutId = setTimeout(() => {
+        this.loading = loading
+      }, 300)
     }
   }
 })

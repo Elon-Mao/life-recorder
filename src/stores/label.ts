@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { updateDoc, DocumentData } from 'firebase/firestore'
-import { customAsync } from '@/config/customAsync'
+import { customAsync } from '@/common/customPromise'
 import { useUserStore } from '@/stores/user'
 
 export interface Label {

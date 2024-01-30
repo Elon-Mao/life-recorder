@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { useLabelStore } from '@/stores/label'
-
-const labelStore = useLabelStore()
+import { useUserStore } from '@/stores/user'
+import { doc, setDoc, DocumentData, onSnapshot, DocumentReference, Unsubscribe, getDoc } from 'firebase/firestore'
+import { customAsync } from '@/common/customPromise'
 
 interface RecordData {
   labelId: string
@@ -19,7 +20,7 @@ export interface Record extends Partial<RecordData> {
 }
 
 const calculateLabelName = (record: Record) => {
-  record.labelName = labelStore.labels.find((label) => label.id === record.labelId)!.name
+  record.labelName = useLabelStore().labels.find((label) => label.id === record.labelId)!.name
 }
 
 const calculateSpan = (record: Record) => {
@@ -56,78 +57,60 @@ const addRecord = (records: Record[], newRecord: Record) => {
   return true
 }
 
+const saveRecords = async (recordsDoc: DocumentReference, records: Record[]) => {
+  await customAsync(() => {
+    setDoc(recordsDoc, {
+      records: records.map((record) => `${record.labelId},${record.startTime},${record.endTime},${record.remark}`).join('\n')
+    })
+  })
+}
+
 export const useRecordStore = defineStore('record', {
   state: () => {
-    // return {
-    //   records: [{
-    //     labelId: '1',
-    //     startTime: '18:04',
-    //     endTime: '20:05',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '18:03',
-    //     endTime: '18:04',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '18:02',
-    //     endTime: '18:03',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '18:01',
-    //     endTime: '18:02',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '18:00',
-    //     endTime: '18:01',
-    //     remark: ''
-    //   }, {
-    //     labelId: '3',
-    //     startTime: '11:00',
-    //     endTime: '11:30',
-    //     remark: ''
-    //   }, {
-    //     labelId: '2',
-    //     startTime: '10:00',
-    //     endTime: '10:45',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '09:30',
-    //     endTime: '10:00',
-    //     remark: ''
-    //   }, {
-    //     labelId: '1',
-    //     startTime: '09:00',
-    //     endTime: '09:30',
-    //     remark: ''
-    //   }].map(convertToRecord)
-    // }
     return {
-      records: [] as Record[]
+      records: [] as Record[],
+      recordsDoc: null as DocumentReference | null,
+      recordSnapshot: null as Unsubscribe | null
     }
   },
   actions: {
+    setByDoc(doc: DocumentData | undefined) {
+      if (!doc) {
+        this.records = []
+        return
+      }
+      this.records = doc.records.split('\n').map((recordStr: string) => {
+        const [labelId, startTime, endTime, remark] = recordStr.split(',')
+        return convertToRecord({ labelId, startTime, endTime, remark })
+      })
+    },
+    async getRecords(date: string) {
+      if (this.recordSnapshot) {
+        this.recordSnapshot()
+      }
+      date = date.replaceAll('/', '')
+      this.recordsDoc = doc(useUserStore().recordsCollection!, date)
+      debugger
+      await customAsync(() => getDoc(this.recordsDoc!))
+      debugger
+      this.recordSnapshot = onSnapshot(this.recordsDoc, (newDoc) => {
+        debugger
+        this.setByDoc(newDoc.data())
+      })
+    },
     async addRecord(newRecord: Record, index = Infinity) {
       const newRecords = [...this.records]
       newRecords.splice(index, 1)
       if (!addRecord(newRecords, newRecord)) {
         return false
       }
-      // fetch()
-      calculateLabelName(newRecord)
-      calculateSpan(newRecord)
-      this.records = newRecords
+      await saveRecords(this.recordsDoc!, newRecords)
       return true
     },
     async deleteRecord(index: number) {
       const newRecords = [...this.records]
       newRecords.splice(index, 1)
-      // fetch()
-      this.records = newRecords
+      await saveRecords(this.recordsDoc!, newRecords)
     }
   },
 })
