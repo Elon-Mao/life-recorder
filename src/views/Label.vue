@@ -11,35 +11,39 @@ import {
   showConfirmDialog,
   showNotify
 } from 'vant'
-import { useLabelStore } from '@/stores/label'
+import { Label, useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 
 const labelStore = useLabelStore()
 const labelForm = ref()
-const editingName = ref('')
+const initLabel = {
+  labelName: '',
+  recordNum: 0
+}
+const editingLabel = ref<Label>({
+  ...initLabel
+})
 const showAction = ref(false)
 const showEditor = ref(false)
-const editingIndex = ref(-1)
-const editingTitle = computed(() => editingIndex.value === -1 ? 'Add Lable' : 'Rename')
+const editingTitle = computed(() => editingLabel.value.id ? 'Rename' : 'Add Lable')
 
 const actions: VanAction[] = [{
   name: 'rename',
   execute: () => {
-    editingName.value = labelStore.labels[editingIndex.value].name
     showAction.value = false
     showLabelEditor()
   }
 }, {
   name: 'delete',
   execute: async () => {
-    if (labelStore.labels[editingIndex.value].recordNum) {
+    if (editingLabel.value.recordNum > 0) {
       showNotify('Please delete relevant records first')
       return
     }
     await showConfirmDialog({
-      message: 'Data will not be recovered'
+      message: 'Data will not be able to recover'
     })
-    await labelStore.deleteLabel(editingIndex.value)
+    await labelStore.deleteById(editingLabel.value.id!)
     showAction.value = false
   },
   color: '#ee0a24'
@@ -53,8 +57,10 @@ const showLabelEditor = () => {
   showEditor.value = true 
 }
 
-const labelOnClick = (index: number) => {
-  editingIndex.value = index
+const labelOnClick = (label: Label) => {
+  editingLabel.value = {
+    ...label
+  }
   showAction.value = true
 }
 
@@ -65,10 +71,10 @@ const beforeClose = async (action: string) => {
 
   try {
     await labelForm.value.validate()
-    if (editingIndex.value === -1) {
-      await labelStore.addLabel(editingName.value)
+    if (editingLabel.value.id) {
+      await labelStore.setById(editingLabel.value)
     } else {
-      await labelStore.rename(editingIndex.value, editingName.value)
+      await labelStore.addEntity(editingLabel.value)
     }
     return true
   } catch {
@@ -77,23 +83,23 @@ const beforeClose = async (action: string) => {
 }
 
 const addLable = () => {
-  editingIndex.value = -1
-  editingName.value = ''
+  editingLabel.value = {
+    ...initLabel
+  }
   showLabelEditor()
 }
 
 const uniqueValidator = () => {
-  const findIndex = labelStore.labels.findIndex((label) => label.name === editingName.value)
-  return findIndex === -1 || findIndex === editingIndex.value
+  const findLabel = labelStore.labels.find((label) => label.labelName === editingLabel.value.labelName)
+  return !findLabel || findLabel.id === editingLabel.value.id
 }
 </script>
 
 <template>
   <div class="label-list">
-    <van-cell v-for="(label, index) in labelStore.labels" :key="label.id" is-link
-      @click="labelOnClick(index)">
+    <van-cell v-for="label in labelStore.labels" :key="label.id" is-link @click="labelOnClick(label)">
       <template #title>
-        <van-text-ellipsis :content="label.name" />
+        <van-text-ellipsis :content="label.labelName" />
       </template>
     </van-cell>
   </div>
@@ -101,7 +107,7 @@ const uniqueValidator = () => {
   <van-icon name="add" color="#1989fa" size="3rem" class="add-label-icon" @click="addLable" />
   <van-dialog v-model:show="showEditor" :title="editingTitle" show-cancel-button :before-close="beforeClose">
     <van-form ref="labelForm">
-      <van-field v-model="editingName" placeholder="label name" maxlength="50"
+      <van-field v-model="editingLabel.labelName" placeholder="label name" maxlength="50"
         :rules="[{ required: true, message: 'not empty' }, { validator: uniqueValidator, message: 'name repeat' }]" />
     </van-form>
   </van-dialog>

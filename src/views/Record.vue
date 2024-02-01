@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import {
   NavBar as VanNavBar,
   Calendar as VanCalendar,
@@ -17,18 +17,55 @@ import {
   showNotify,
   showConfirmDialog
 } from 'vant'
+import {
+  collection,
+  doc,
+  query,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+where,
+Unsubscribe
+} from 'firebase/firestore'
+import { db } from '@/config/firebase'
+import customPromise from '@/common/customPromise'
 import { useUserStore } from '@/stores/user'
-import { useRecordStore, Record } from '@/stores/record'
 import { useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
+import RecordData from '@/types/RecordData'
+
+interface RecordForm extends Partial<RecordData> {
+  labelName?: string
+  labelPicker: string[]
+  startTimeParts: string[]
+  endTimeParts: string[]
+  span?: number
+}
 
 const userStore = useUserStore()
-const recordStore = useRecordStore()
 const labelStore = useLabelStore()
+const recordCollection = collection(db, `users/${userStore.user.uid}/records`)
 
-const editingIndex = ref(Infinity)
-const editingRecord = ref<Record>({})
+const getCurrentTimeParts = () => {
+  const currentDate = new Date()
+  return [currentDate.getHours() + '', currentDate.getMinutes() + '']
+}
+
+const getInitRecord = () => {
+  const currentTimeParts = getCurrentTimeParts()
+  return {
+    labelPicker: [],
+    startTimeParts: [...currentTimeParts],
+    endTimeParts: [...currentTimeParts],
+    remark: ''
+  }
+}
+
+const editingRecord = ref<RecordForm>(getInitRecord())
 const showPickerGroup = ref(false)
+const showAction = ref(false)
+const showCalendar = ref(false)
+const addMode = ref('start now')
 
 const actions: VanAction[] = [{
   name: 'End now',
@@ -38,9 +75,6 @@ const actions: VanAction[] = [{
 }, {
   name: 'Edit',
   execute: () => {
-    editingRecord.value = {
-      ...recordStore.records[editingIndex.value]
-    }
     showAction.value = false
     showPickerGroup.value = true
   }
@@ -50,10 +84,11 @@ const actions: VanAction[] = [{
     await showConfirmDialog({
       message: 'Data will not be recovered'
     })
-    try {
-      await recordStore.deleteRecord(editingIndex.value)
-      showAction.value = false
-    } catch { }
+    await customPromise(Promise.all([
+      deleteDoc(doc(recordCollection, editingRecord.value.id)),
+      labelStore.setRecordNum(editingRecord.value.labelId!, -1)
+    ]))
+    showAction.value = false
   },
   color: '#ee0a24'
 }]
@@ -61,26 +96,20 @@ const onActionSelect = (item: VanAction) => {
   item.execute()
 }
 
-const showAction = ref(false)
-
-const recordOnClick = (index: number) => {
-  editingIndex.value = index
+const recordOnClick = (recordData: RecordForm) => {
+  editingRecord.value = {
+    ...recordData
+  }
   showAction.value = true
 }
 
 const addRecord = () => {
-  editingIndex.value = Infinity
-  const newRecord: Record = {}
-  newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
-  newRecord.remark = ''
-  editingRecord.value = newRecord
+  editingRecord.value = getInitRecord()
   showPickerGroup.value = true
 }
 
-const addMode = ref('start now')
-
 const isStartMode = () => {
-  return editingIndex.value === Infinity && addMode.value === 'start now'
+  return editingRecord === null && addMode.value === 'start now'
 }
 
 const pickerTabs = computed(() => {
@@ -90,9 +119,17 @@ const pickerTabs = computed(() => {
   return ['label', 'start time', 'end time']
 })
 
-const getCurrentTimeParts = () => {
-  const currentDate = new Date()
-  return [currentDate.getHours() + '', currentDate.getMinutes() + '']
+const isTimeConflict = (newRecord: RecordForm) => {
+  const findRecord = records.value.find((record) => {
+    if (record.id === editingRecord.value.id) {
+      return false
+    }
+    return newRecord.startTime! >= record.endTime!
+  })
+  if (!findRecord) {
+    return false
+  }
+  return newRecord.endTime! > findRecord.startTime!
 }
 
 const onRecordConfirm = async () => {
@@ -100,29 +137,42 @@ const onRecordConfirm = async () => {
   if (isStartMode()) {
     newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
   }
-  newRecord.startTime = newRecord.startTimeParts!.join(':')
-  newRecord.endTime = newRecord.endTimeParts!.join(':')
+  newRecord.startTime = newRecord.startTimeParts.join(':')
+  newRecord.endTime = newRecord.endTimeParts.join(':')
   if (newRecord.startTime > newRecord.endTime) {
     showNotify('End time cannot be earlier than start time')
     return
   }
-
-  newRecord.labelId = newRecord.labelPicker![0]
-  try {
-    const result = await recordStore.addRecord(newRecord, editingIndex.value)
-    if (result) {
-      showPickerGroup.value = false
-      showNotify({ type: 'success', message: 'add success' })
-    } else {
-      showNotify('time conflict')
-    }
-  } catch { }
+  if (isTimeConflict(newRecord)) {
+    showNotify('time conflict')
+    return
+  }
+  const data = {
+    labelId: newRecord.labelPicker[0],
+    date: recordsDateStr.value,
+    startTime: newRecord.startTime,
+    endTime: newRecord.endTime,
+    remark: newRecord.remark
+  }
+  if (newRecord.id) {
+    await customPromise(setDoc(doc(recordCollection, newRecord.id), data))
+  } else {
+    const newDoc = doc(recordCollection)
+    await customPromise(Promise.all([
+      setDoc(doc(recordCollection, newDoc.id), data),
+      labelStore.setRecordNum(data.labelId, 1)
+    ]))
+  }
+  
+  showPickerGroup.value = false
+  showNotify({ type: 'success', message: 'add success' })
 }
 
 const addRecordDate = (addNum: number) => {
-  const newDate = new Date(recordsDate.value)
+  const newDate = new Date(recordsDate)
   newDate.setDate(newDate.getDate() + addNum)
-  recordsDate.value = newDate
+  recordsDate = newDate
+  onDateChange()
 }
 const lastDay = () => {
   addRecordDate(-1)
@@ -130,21 +180,59 @@ const lastDay = () => {
 const nextDay = () => {
   addRecordDate(1)
 }
-
-const showCalendar = ref(false)
-let recordsDate = ref(new Date())
-const recordsDateStr = computed(() => `${recordsDate.value.getFullYear()}/${String(recordsDate.value.getMonth() + 1).padStart(2, '0')}/${recordsDate.value.getDate()}`)
 const onDateConfirm = (value: Date) => {
-  recordsDate.value = value
+  recordsDate = value
+  onDateChange()
   showCalendar.value = false
 }
-const getRecords = () => {
-  if (userStore.recordsCollection) {
-    recordStore.getRecords(recordsDateStr.value)
-  }
+
+const calculateLabelName = (record: RecordForm) => {
+  record.labelName = useLabelStore().labels.find((label) => label.id === record.labelId)!.labelName
 }
-watch(recordsDateStr, getRecords)
-watch(() => userStore.recordsCollection, getRecords)
+
+const calculateSpan = (record: RecordForm) => {
+  const startTimeMinutes = Number(record.startTimeParts![0]) * 60 + Number(record.startTimeParts![1])
+  const endTimeMinutes = Number(record.endTimeParts![0]) * 60 + Number(record.endTimeParts![1])
+  record.span = endTimeMinutes - startTimeMinutes
+}
+
+const convertToRecord = (recordData: RecordData): RecordForm => {
+  const record = {
+    ...recordData,
+    labelPicker: [recordData.labelId],
+    startTimeParts: recordData.startTime.split(':'),
+    endTimeParts: recordData.endTime.split(':')
+  }
+  calculateLabelName(record)
+  calculateSpan(record)
+  return record
+}
+
+let recordsDate = new Date()
+const recordsDateStr = ref('')
+const records = ref<RecordForm[]>([])
+let unsubscribe: Unsubscribe
+const onDateChange = () => {
+  const newDateStr = `${recordsDate.getFullYear()}/${String(recordsDate.getMonth() + 1).padStart(2, '0')}/${recordsDate.getDate()}`
+  if (newDateStr === recordsDateStr.value) {
+    return
+  }
+  recordsDateStr.value = newDateStr
+  if (unsubscribe) {
+    unsubscribe()
+  }
+  unsubscribe = onSnapshot(query(recordCollection, where('date', '==', recordsDateStr.value)), (querySnapshot) => {
+    records.value = []
+    querySnapshot.forEach((doc) => {
+      records.value.push(convertToRecord({
+        id: doc.id,
+        ...doc.data()
+      } as RecordData))
+    })
+    records.value.sort((record0, record1) => record0.startTime! > record1.startTime! ? -1 : 1)
+  })
+}
+onDateChange()
 </script>
 
 <template>
@@ -164,7 +252,7 @@ watch(() => userStore.recordsCollection, getRecords)
         </div>
       </template>
     </van-cell>
-    <van-cell v-for="(record, index) in recordStore.records" is-link center @click="recordOnClick(index)">
+    <van-cell v-for="record in records" :key="record.id" is-link center @click="recordOnClick(record)">
       <template #title>
         <van-text-ellipsis :content="record.labelName" />
       </template>
@@ -182,14 +270,14 @@ watch(() => userStore.recordsCollection, getRecords)
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
     <van-picker-group :tabs="pickerTabs" @cancel="showPickerGroup = false" @confirm="onRecordConfirm">
-      <template #title v-if="editingIndex === Infinity">
+      <template #title v-if="!editingRecord.id">
         <van-radio-group v-model="addMode" direction="horizontal" class="add-mode-wrapper">
           <van-radio name="start now">start now</van-radio>
           <van-radio name="import">import</van-radio>
         </van-radio-group>
       </template>
       <van-picker v-model="editingRecord.labelPicker" :visible-option-num="3" :columns="labelStore.labels"
-        :columns-field-names="{ text: 'name', value: 'id' }" />
+        :columns-field-names="{ text: 'labelName', value: 'id' }" />
       <van-time-picker v-model="editingRecord.startTimeParts" :visible-option-num="3" />
       <van-time-picker v-model="editingRecord.endTimeParts" :visible-option-num="3" />
     </van-picker-group>

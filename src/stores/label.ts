@@ -1,60 +1,68 @@
 import { defineStore } from 'pinia'
-import { updateDoc, DocumentData } from 'firebase/firestore'
-import { customAsync } from '@/common/customPromise'
-import { useUserStore } from '@/stores/user'
+import {
+  collection,
+  doc,
+  query,
+  setDoc,
+  deleteDoc,
+  onSnapshot
+} from 'firebase/firestore'
+import { db } from '@/config/firebase'
+import customPromise from '@/common/customPromise'
+import { useUserStore } from './user'
 
 export interface Label {
-  id: string
-  name: string
+  id?: string
+  labelName: string
   recordNum: number
 }
 
-const saveLabels = async (labels: Label[], labelMaxId: number) => {
-  await customAsync(() => {
-    updateDoc(useUserStore().userDoc!, {
-      labels: labels.map((label) => `${label.id},${label.name},${label.recordNum}`).join('\n'),
-      labelMaxId
-    })
-  })
-}
+const userStore = useUserStore()
+const labelCollection = collection(db, `users/${userStore.user.uid}/labels`)
 
-export const useLabelStore = defineStore('label', {
+const useLabelStore = defineStore('labels', {
   state: () => {
     return {
-      labels: [] as Label[],
-      labelMaxId: 0
+      labels: [] as Label[]
     }
   },
   actions: {
-    setByDoc(doc: DocumentData) {
-      this.labels = doc.labels.split('\n').map((labelStr: string) => {
-        const [id, name, recordNum] = labelStr.split(',')
-        return {
-          id, name,
-          recordNum: Number(recordNum)
-        }
+    init() {
+      onSnapshot(query(labelCollection), (querySnapshot) => {
+        this.labels = []
+        querySnapshot.forEach((doc) => {
+          this.labels.push({
+            id: doc.id,
+            ...doc.data()
+          } as Label)
+        })
       })
-      this.labelMaxId = doc.labelMaxId
     },
-    async rename(index: number, newName: string) {
-      const newLabels = [...this.labels]
-      newLabels[index].name = newName
-      await saveLabels(newLabels, this.labelMaxId)
+    async setById(label: Label) {
+      const { id, ...labelData } = label
+      await customPromise(setDoc(doc(labelCollection, id), labelData))
     },
-    async addLabel(labelName: string) {
-      const newLabels = [...this.labels]
-      const newId = this.labelMaxId + 1
-      newLabels.unshift({
-        id: newId + '',
-        name: labelName,
-        recordNum: 0
+    async addEntity(label: Label) {
+      const newDoc = doc(labelCollection)
+      await this.setById({
+        id: newDoc.id,
+        ...label
       })
-      await saveLabels(newLabels, newId)
+      return newDoc.id
     },
-    async deleteLabel(index: number) {
-      const newLabels = [...this.labels]
-      newLabels.splice(index, 1)
-      await saveLabels(newLabels, this.labelMaxId)
-    }
-  },
+    async deleteById(id: string) {
+      await customPromise(deleteDoc(doc(labelCollection, id)))
+    },
+    async setRecordNum(id: string, addNum: number) {
+      const label = {
+        ...this.labels.find((label) => label.id === id)!
+      }
+      label.recordNum += addNum
+      await this.setById(label)
+    },
+  }
 })
+
+useLabelStore().init()
+
+export { useLabelStore }
