@@ -24,8 +24,8 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
-where,
-Unsubscribe
+  where,
+  Unsubscribe
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import customPromise from '@/common/customPromise'
@@ -63,20 +63,28 @@ const getInitRecord = () => {
 
 const editingRecord = ref<RecordForm>(getInitRecord())
 const showPickerGroup = ref(false)
+const activeTab = ref(0)
 const showAction = ref(false)
 const showCalendar = ref(false)
 const addMode = ref('start now')
 
+const openPickerGroup = () => {
+  activeTab.value = 0
+  showPickerGroup.value = true
+}
+
 const actions: VanAction[] = [{
   name: 'End now',
-  execute: () => {
-
+  execute: async () => {
+    editingRecord.value.endTimeParts = getCurrentTimeParts()
+    await onRecordConfirm()
+    showAction.value = false
   }
 }, {
   name: 'Edit',
   execute: () => {
     showAction.value = false
-    showPickerGroup.value = true
+    openPickerGroup()
   }
 }, {
   name: 'Delete',
@@ -97,6 +105,7 @@ const onActionSelect = (item: VanAction) => {
 }
 
 const recordOnClick = (recordData: RecordForm) => {
+  addMode.value = 'import'
   editingRecord.value = {
     ...recordData
   }
@@ -104,8 +113,9 @@ const recordOnClick = (recordData: RecordForm) => {
 }
 
 const addRecord = () => {
+  addMode.value = 'start now'
   editingRecord.value = getInitRecord()
-  showPickerGroup.value = true
+  openPickerGroup()
 }
 
 const isStartMode = () => {
@@ -120,16 +130,17 @@ const pickerTabs = computed(() => {
 })
 
 const isTimeConflict = (newRecord: RecordForm) => {
-  const findRecord = records.value.find((record) => {
+  let laterRecord = null
+  for (const record of records.value) {
     if (record.id === editingRecord.value.id) {
-      return false
+      continue
     }
-    return newRecord.startTime! >= record.endTime!
-  })
-  if (!findRecord) {
-    return false
+    if (newRecord.startTime! >= record.endTime!) {
+      break
+    }
+    laterRecord = record
   }
-  return newRecord.endTime! > findRecord.startTime!
+  return laterRecord && newRecord.endTime! > laterRecord.startTime!
 }
 
 const onRecordConfirm = async () => {
@@ -213,7 +224,7 @@ const recordsDateStr = ref('')
 const records = ref<RecordForm[]>([])
 let unsubscribe: Unsubscribe
 const onDateChange = () => {
-  const newDateStr = `${recordsDate.getFullYear()}/${String(recordsDate.getMonth() + 1).padStart(2, '0')}/${recordsDate.getDate()}`
+  const newDateStr = `${recordsDate.getFullYear()}/${String(recordsDate.getMonth() + 1).padStart(2, '0')}/${String(recordsDate.getDate()).padStart(2, '0')}`
   if (newDateStr === recordsDateStr.value) {
     return
   }
@@ -269,7 +280,8 @@ onDateChange()
     @confirm="onDateConfirm" />
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
-    <van-picker-group :tabs="pickerTabs" @cancel="showPickerGroup = false" @confirm="onRecordConfirm">
+    <van-picker-group :tabs="pickerTabs" v-model:active-tab="activeTab" @cancel="showPickerGroup = false"
+      @confirm="onRecordConfirm">
       <template #title v-if="!editingRecord.id">
         <van-radio-group v-model="addMode" direction="horizontal" class="add-mode-wrapper">
           <van-radio name="start now">start now</van-radio>
