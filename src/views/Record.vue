@@ -119,7 +119,7 @@ const addRecord = () => {
 }
 
 const isStartMode = () => {
-  return editingRecord === null && addMode.value === 'start now'
+  return !editingRecord.value.id && addMode.value === 'start now'
 }
 
 const pickerTabs = computed(() => {
@@ -314,7 +314,7 @@ onDateChange()
 }
 
 .span-info {
-  width: 8.3rem;
+  width: 8.5rem;
   display: flex;
   justify-content: space-between;
 }
