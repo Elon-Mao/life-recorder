@@ -143,13 +143,17 @@ const isTimeConflict = (newRecord: RecordForm) => {
   return laterRecord && newRecord.endTime! > laterRecord.startTime!
 }
 
+const timePartsToStr = (timeParts: string[]) => {
+  return timeParts.map((timePart) => timePart.padStart(2, '0')).join(':')
+}
+
 const onRecordConfirm = async () => {
   const newRecord = editingRecord.value
   if (isStartMode()) {
     newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
   }
-  newRecord.startTime = newRecord.startTimeParts.join(':')
-  newRecord.endTime = newRecord.endTimeParts.join(':')
+  newRecord.startTime = timePartsToStr(newRecord.startTimeParts)
+  newRecord.endTime = timePartsToStr(newRecord.endTimeParts)
   if (newRecord.startTime > newRecord.endTime) {
     showNotify('End time cannot be earlier than start time')
     return
@@ -166,7 +170,12 @@ const onRecordConfirm = async () => {
     remark: newRecord.remark
   }
   if (newRecord.id) {
-    await customPromise(setDoc(doc(recordCollection, newRecord.id), data))
+    const promiseAll = [setDoc(doc(recordCollection, newRecord.id), data)]
+    const oldLabelId = records.value.find((record) => record.id === newRecord.id)!.labelId!
+    if (oldLabelId !== newRecord.labelId) {
+      promiseAll.push(labelStore.setRecordNum(oldLabelId, -1))
+    }
+    await customPromise(Promise.all(promiseAll))
   } else {
     const newDoc = doc(recordCollection)
     await customPromise(Promise.all([
@@ -180,9 +189,9 @@ const onRecordConfirm = async () => {
 }
 
 const addRecordDate = (addNum: number) => {
-  const newDate = new Date(recordsDate)
+  const newDate = new Date(recordsDate.value)
   newDate.setDate(newDate.getDate() + addNum)
-  recordsDate = newDate
+  recordsDate.value = newDate
   onDateChange()
 }
 const lastDay = () => {
@@ -192,7 +201,7 @@ const nextDay = () => {
   addRecordDate(1)
 }
 const onDateConfirm = (value: Date) => {
-  recordsDate = value
+  recordsDate.value = value
   onDateChange()
   showCalendar.value = false
 }
@@ -219,12 +228,12 @@ const convertToRecord = (recordData: RecordData): RecordForm => {
   return record
 }
 
-let recordsDate = new Date()
+let recordsDate = ref(new Date())
 const recordsDateStr = ref('')
 const records = ref<RecordForm[]>([])
 let unsubscribe: Unsubscribe
 const onDateChange = () => {
-  const newDateStr = `${recordsDate.getFullYear()}/${String(recordsDate.getMonth() + 1).padStart(2, '0')}/${String(recordsDate.getDate()).padStart(2, '0')}`
+  const newDateStr = `${recordsDate.value.getFullYear()}/${String(recordsDate.value.getMonth() + 1).padStart(2, '0')}/${String(recordsDate.value.getDate()).padStart(2, '0')}`
   if (newDateStr === recordsDateStr.value) {
     return
   }
@@ -270,14 +279,14 @@ onDateChange()
       <template #label>
         <div class="span-info">
           <span>{{ `${record.startTime}~${record.endTime}` }}</span>
-          <span>{{ `${record.span}minutes` }}</span>
+          <span>{{ `${record.span} minutes` }}</span>
         </div>
         <span>{{ record.remark }}</span>
       </template>
     </van-cell>
   </div>
   <van-calendar v-model:show="showCalendar" :round="false" position="top" :min-date="new Date('2023/01/01')"
-    @confirm="onDateConfirm" />
+    @confirm="onDateConfirm" :default-date="recordsDate"/>
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
     <van-picker-group :tabs="pickerTabs" v-model:active-tab="activeTab" @cancel="showPickerGroup = false"
@@ -314,7 +323,7 @@ onDateChange()
 }
 
 .span-info {
-  width: 8.5rem;
+  width: 9rem;
   display: flex;
   justify-content: space-between;
 }
