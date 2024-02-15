@@ -54,14 +54,18 @@ const getCurrentTimeParts = () => {
 const getInitRecord = () => {
   const currentTimeParts = getCurrentTimeParts()
   return {
-    labelPicker: [],
+    labelPicker: [labelStore.labels[0].id!],
     startTimeParts: [...currentTimeParts],
     endTimeParts: [...currentTimeParts],
     remark: ''
   }
 }
 
-const editingRecord = ref<RecordForm>(getInitRecord())
+const editingRecord = ref<RecordForm>({
+  labelPicker: [],
+  startTimeParts: [],
+  endTimeParts: []
+})
 const showPickerGroup = ref(false)
 const activeTab = ref(0)
 const showAction = ref(false)
@@ -113,6 +117,10 @@ const recordOnClick = (recordData: RecordForm) => {
 }
 
 const addRecord = () => {
+  if (!labelStore.labels.length) {
+    showNotify('Please add label first')
+    return
+  }
   addMode.value = 'start now'
   editingRecord.value = getInitRecord()
   openPickerGroup()
@@ -149,10 +157,6 @@ const timePartsToStr = (timeParts: string[]) => {
 
 const onRecordConfirm = async () => {
   const newRecord = editingRecord.value
-  if (!newRecord.labelPicker.length) {
-    showNotify('Please select label')
-    return
-  }
   if (isStartMode()) {
     newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
   }
@@ -211,7 +215,7 @@ const onDateConfirm = (value: Date) => {
 }
 
 const calculateLabelName = (record: RecordForm) => {
-  record.labelName = useLabelStore().labels.find((label) => label.id === record.labelId)!.labelName
+  record.labelName = labelStore.labels.find((label) => label.id === record.labelId)!.labelName
 }
 
 const calculateSpan = (record: RecordForm) => {
