@@ -149,6 +149,10 @@ const timePartsToStr = (timeParts: string[]) => {
 
 const onRecordConfirm = async () => {
   const newRecord = editingRecord.value
+  if (!newRecord.labelPicker.length) {
+    showNotify('Please select label')
+    return
+  }
   if (isStartMode()) {
     newRecord.startTimeParts = newRecord.endTimeParts = getCurrentTimeParts()
   }
