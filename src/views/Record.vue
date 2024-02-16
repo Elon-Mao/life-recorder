@@ -167,7 +167,7 @@ const onRecordConfirm = async () => {
     return
   }
   if (isTimeConflict(newRecord)) {
-    showNotify('time conflict')
+    showNotify('Time Conflict')
     return
   }
   const data = {
@@ -193,7 +193,7 @@ const onRecordConfirm = async () => {
   }
   
   showPickerGroup.value = false
-  showNotify({ type: 'success', message: 'add success' })
+  showNotify({ type: 'success', message: 'Add Success' })
 }
 
 const addRecordDate = (addNum: number) => {
