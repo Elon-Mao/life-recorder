@@ -8,8 +8,7 @@ import {
   Form as VanForm,
   Field as VanField,
   TextEllipsis as VanTextEllipsis,
-  showConfirmDialog,
-  showNotify
+  showConfirmDialog
 } from 'vant'
 import { Label, useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'

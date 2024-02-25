@@ -5,7 +5,9 @@ import {
   query,
   setDoc,
   deleteDoc,
-  onSnapshot
+  onSnapshot,
+  CollectionReference,
+  DocumentData
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import customPromise from '@/common/customPromise'
@@ -17,18 +19,17 @@ export interface Label {
   recordNum: number
 }
 
-const userStore = useUserStore()
-const labelCollection = collection(db, `users/${userStore.user.uid}/labels`)
-
-const useLabelStore = defineStore('labels', {
+export const useLabelStore = defineStore('labels', {
   state: () => {
     return {
-      labels: [] as Label[]
+      labels: [] as Label[],
+      labelCollection: null as unknown as CollectionReference<DocumentData, DocumentData>
     }
   },
   actions: {
     init() {
-      onSnapshot(query(labelCollection), (querySnapshot) => {
+      this.labelCollection = collection(db, `users/${useUserStore().user.uid}/labels`)
+      onSnapshot(query(this.labelCollection), (querySnapshot) => {
         this.labels = []
         querySnapshot.forEach((doc) => {
           this.labels.push({
@@ -41,10 +42,10 @@ const useLabelStore = defineStore('labels', {
     },
     async setById(label: Label) {
       const { id, ...labelData } = label
-      await customPromise(setDoc(doc(labelCollection, id), labelData))
+      await customPromise(setDoc(doc(this.labelCollection, id), labelData))
     },
     async addEntity(label: Label) {
-      const newDoc = doc(labelCollection)
+      const newDoc = doc(this.labelCollection)
       await this.setById({
         id: newDoc.id,
         ...label
@@ -52,7 +53,7 @@ const useLabelStore = defineStore('labels', {
       return newDoc.id
     },
     async deleteById(id: string) {
-      await customPromise(deleteDoc(doc(labelCollection, id)))
+      await customPromise(deleteDoc(doc(this.labelCollection, id)))
     },
     async setRecordNum(id: string, addNum: number) {
       const label = {
@@ -63,7 +64,3 @@ const useLabelStore = defineStore('labels', {
     },
   }
 })
-
-useLabelStore().init()
-
-export { useLabelStore }

@@ -3,20 +3,57 @@ import { ref } from 'vue'
 import {
   NavBar as VanNavBar,
   Icon as VanIcon,
-  Popover as VanPopover
+  Popover as VanPopover,
+  Cell as VanCell,
 } from 'vant'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useLabelStore } from '@/stores/label'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
-import { auth, provider } from '@/config/firebase'
+import { auth, provider, db } from '@/config/firebase'
+import {
+  collection,
+  query,
+  getDocs,
+} from 'firebase/firestore'
+import downloadText from '@/common/downloadText'
+import RecordData from '@/types/RecordData'
 
 const showUserPop = ref(false)
 const route = useRoute()
 const userStore = useUserStore()
+const labelStore = useLabelStore()
 onAuthStateChanged(auth, (user) => {
   showUserPop.value = false
   userStore.setUser(user)
 })
+
+const exportUserData = async () => {
+  const querySnapshot = await getDocs(query(collection(db, `users/${useUserStore().user.uid}/records`)))
+  const records: RecordData[] = []
+  querySnapshot.forEach((doc) => {
+    records.push({
+      id: doc.id,
+      ...doc.data()
+    } as RecordData)
+  })
+  records.sort((record0, record1) => {
+    if (record0.date > record1.date) {
+      return -1
+    }
+    if (record0.date < record1.date) {
+      return 1
+    }
+    return record0.startTime! > record1.startTime! ? -1 : 1
+  })
+
+  downloadText('Record Id,Label Id,Date,Start Time,End Time,Remark,\n' + records.map((record) =>
+    `${record.id},${record.labelId},${record.date},${record.startTime},${record.endTime},${record.remark}`)
+    .join(',\n'), 'records.csv')
+  downloadText('Label Id,Name,Record Number,\n' + labelStore.labels.map((label) =>
+    `${label.id},${label.labelName},${records.reduce((recordNum, record) => record.labelId === label.id ? recordNum + 1 : recordNum
+      , 0)}`).join(',\n'), 'labels.csv')
+}
 </script>
 
 <template>
@@ -25,13 +62,12 @@ onAuthStateChanged(auth, (user) => {
       <van-popover v-model:show="showUserPop" placement="bottom-end">
         <div class="user-pop">
           <template v-if="userStore.user">
-            <div>
-              <van-icon name="user-circle-o" size="1.5rem" />
-              <span>{{ userStore.user.displayName }}</span>
-            </div>
-            <span class="pop-button" @click="signOut(auth)">Logout</span>
+            <van-cell :title="userStore.user.displayName" icon="user" size="large" class="user-name" />
+            <van-cell title="Export User Data" icon="down" @click="exportUserData" />
+            <van-cell title="Import User Data" icon="upgrade" />
+            <van-cell title="Sign Out" icon="exchange" @click="signOut(auth)" />
           </template>
-          <span v-else class="pop-button" @click="signInWithPopup(auth, provider)">Sign In With Google</span>
+          <van-cell v-else title="Sign In With Google" icon="home-o" @click="signInWithPopup(auth, provider)" />
         </div>
         <template #reference>
           <div v-if="userStore.user" class="user-avatar">{{ (userStore.user.displayName || '?')[0] }}</div>
@@ -44,29 +80,12 @@ onAuthStateChanged(auth, (user) => {
 
 <style scoped>
 .user-pop {
-  white-space: nowrap;
   display: flex;
   flex-direction: column;
 }
 
-.user-pop>div {
-  height: 2rem;
-  display: flex;
-  align-items: flex-end;
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
-}
-
-.user-pop>span {
-  padding: 0.5rem 1rem;
-}
-
-.pop-button {
-  cursor: pointer;
-}
-
-.pop-button:active {
-  background-color: rgb(242, 243, 245);
+.user-name {
+  background-color: var(--van-gray-3);
 }
 
 .user-avatar {

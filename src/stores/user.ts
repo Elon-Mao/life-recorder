@@ -2,6 +2,7 @@ import router from '@/router'
 import { defineStore } from 'pinia'
 import { auth } from '@/config/firebase'
 import { useSystemStore } from '@/stores/system'
+import { useLabelStore } from '@/stores/label'
 import type { User } from 'firebase/auth'
 
 export const useUserStore = defineStore('user', {
@@ -27,6 +28,7 @@ export const useUserStore = defineStore('user', {
 
       localStorage.setItem('user', JSON.stringify(user))
       router.push({ name: 'Home'})
+      useLabelStore().init()
       success()
     }
   },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   NavBar as VanNavBar,
   Calendar as VanCalendar,
@@ -15,7 +15,8 @@ import {
   Radio as VanRadio,
   ActionSheet as VanActionSheet,
   showNotify,
-  showConfirmDialog
+  showConfirmDialog,
+  Icon as vanIcon,
 } from 'vant'
 import {
   collection,
@@ -260,16 +261,34 @@ const onDateChange = () => {
     records.value.sort((record0, record1) => record0.startTime! > record1.startTime! ? -1 : 1)
   })
 }
-onDateChange()
+
+if (labelStore.labels.length) {
+  onDateChange()
+} else {
+  const labelsWatch = watch(() => labelStore.labels, () => {
+    if (labelStore.labels.length) {
+      onDateChange()
+      labelsWatch()
+    }
+  })
+}
 </script>
 
 <template>
   <div class="record-container">
-    <van-nav-bar left-text="Last Day" right-text="Next Day" @click-left="lastDay" @click-right="nextDay">
+    <van-nav-bar @click-left="lastDay" @click-right="nextDay">
       <template #title>
         <van-button icon="calendar-o" @click="showCalendar = true">
           {{ recordsDateStr }}
         </van-button>
+      </template>
+      <template #left>
+        <van-icon name="arrow-left" />
+        <span class="van-nav-bar__text">Last Day</span>
+      </template>
+      <template #right>
+        <span class="van-nav-bar__text">Next Day</span>
+        <van-icon name="arrow" />
       </template>
     </van-nav-bar>
     <van-cell class="van-contact-card" is-link center size="large" @click="addRecord">
