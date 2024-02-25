@@ -36,6 +36,7 @@ const useLabelStore = defineStore('labels', {
             ...doc.data()
           } as Label)
         })
+        this.labels.sort((label0, label1) => label0.recordNum < label1.recordNum ? 1 : -1)
       })
     },
     async setById(label: Label) {

@@ -27,7 +27,7 @@ const showAction = ref(false)
 const showEditor = ref(false)
 const editingTitle = computed(() => editingLabel.value.id ? 'Rename' : 'Add Lable')
 
-const actions: VanAction[] = [{
+const actions = computed<VanAction[]>(() => [{
   name: 'rename',
   execute: () => {
     showAction.value = false
@@ -36,18 +36,15 @@ const actions: VanAction[] = [{
 }, {
   name: 'delete',
   execute: async () => {
-    if (editingLabel.value.recordNum > 0) {
-      showNotify('Please delete relevant records first')
-      return
-    }
     await showConfirmDialog({
       message: 'Data will not be able to recover'
     })
     await labelStore.deleteById(editingLabel.value.id!)
     showAction.value = false
   },
-  color: '#ee0a24'
-}]
+  color: editingLabel.value.recordNum ? '': '#ee0a24',
+  disabled: !!editingLabel.value.recordNum
+}])
 const onActionSelect = (item: VanAction) => {
   item.execute()
 }
@@ -97,7 +94,7 @@ const uniqueValidator = () => {
 
 <template>
   <div class="label-list">
-    <van-cell v-for="label in labelStore.labels" :key="label.id" is-link @click="labelOnClick(label)">
+    <van-cell v-for="label in labelStore.labels" :key="label.id" is-link :label="`Record number: ${label.recordNum}`" @click="labelOnClick(label)">
       <template #title>
         <van-text-ellipsis :content="label.labelName" />
       </template>
