@@ -1,35 +1,47 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   NavBar as VanNavBar,
   Icon as VanIcon,
   Popover as VanPopover,
   Cell as VanCell,
+  Popup as VanPopup,
+  Uploader as VanUploader,
+  Button as VanButton,
+  showConfirmDialog,
+  UploaderFileListItem,
+  showNotify,
 } from 'vant'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
+import { useSystemStore } from '@/stores/system'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
-import { auth, provider, db } from '@/config/firebase'
+import { auth, provider } from '@/config/firebase'
 import {
-  collection,
   query,
   getDocs,
+  deleteDoc,
+  doc,
+  setDoc,
 } from 'firebase/firestore'
 import downloadText from '@/common/downloadText'
 import RecordData from '@/types/RecordData'
 
-const showUserPop = ref(false)
+const userPopShow = ref(false)
+const importPopShow = ref(false)
+const fileList = ref<UploaderFileListItem []>([])
 const route = useRoute()
 const userStore = useUserStore()
 const labelStore = useLabelStore()
+const systemStore = useSystemStore()
 onAuthStateChanged(auth, (user) => {
-  showUserPop.value = false
+  userPopShow.value = false
   userStore.setUser(user)
 })
 
 const exportUserData = async () => {
-  const querySnapshot = await getDocs(query(collection(db, `users/${useUserStore().user.uid}/records`)))
+  const querySnapshot = await getDocs(query(userStore.getRecordsCollection()))
   const records: RecordData[] = []
   querySnapshot.forEach((doc) => {
     records.push({
@@ -54,18 +66,102 @@ const exportUserData = async () => {
     `${label.id},${label.labelName},${records.reduce((recordNum, record) => record.labelId === label.id ? recordNum + 1 : recordNum
       , 0)}`).join(',\n'), 'labels.csv')
 }
+
+const showImportPop = () => {
+  userPopShow.value = false
+  importPopShow.value = true
+}
+
+const confirmSignOut = async () => {
+  await showConfirmDialog({
+    title: 'Sign out?',
+    closeOnClickOverlay: true
+  })
+  signOut(auth)
+}
+
+const importDisabled = computed(() => {
+  if (fileList.value.length !== 2) {
+    return true
+  }
+  const fileName0 = fileList.value[0].file!.name
+  const fileName1 = fileList.value[1].file!.name
+  return !(fileName0 === 'labels.csv' && fileName1 === 'records.csv' || fileName0 === 'records.csv' && fileName1 === 'labels.csv')
+})
+
+const readRecords = (recordsFile: File) => {
+  const recordsReader = new FileReader()
+  recordsReader.onload = async (event: ProgressEvent<FileReader>) => {
+    const recordCollection = userStore.getRecordsCollection()
+    const csv = event.target!.result as String
+    const rows = csv.split('\n')
+    rows.shift()
+    rows.forEach(async row => {
+      const columns = row.split(',')
+      console.log('add record: ', columns[0])
+      await setDoc(doc(recordCollection, columns[0]), {
+        labelId: columns[1],
+        date: columns[2],
+        startTime: columns[3],
+        endTime: columns[4],
+        remark: columns[5],
+      })
+    })
+    systemStore.setLoading(false)
+    showNotify({ type: 'success', message: 'Import Success' })
+    importPopShow.value = false
+  }
+  recordsReader.readAsText(recordsFile)
+}
+
+const readLabels = (labelsFile: File, recordsFile: File) => {
+  systemStore.setLoading(true)
+  const labelsReader = new FileReader()
+  labelsReader.onload = async (event: ProgressEvent<FileReader>) => {
+    const querySnapshot = await getDocs(query(userStore.getRecordsCollection()))
+    querySnapshot.forEach(async (document) => {
+      console.log('delete: ', document.id)
+      await deleteDoc(doc(userStore.getRecordsCollection(), document.id))
+    })
+    await labelStore.deleteAll()
+    const labelsCollection = userStore.getLabelsCollection()
+    const csv = event.target!.result as String
+    const rows = csv.split('\n')
+    rows.shift()
+    rows.forEach(async row => {
+      const columns = row.split(',')
+      console.log('add label: ', columns[0])
+      await setDoc(doc(labelsCollection, columns[0]), {
+        labelName: columns[1],
+        recordNum: Number(columns[2])
+      })
+    })
+    readRecords(recordsFile)
+  }
+  labelsReader.readAsText(labelsFile)
+}
+
+const confirmImport = async () => {
+  await showConfirmDialog({
+    title: 'All data will be covered.'
+  })
+  const file0 = fileList.value[0].file!
+  const file1 = fileList.value[1].file!
+  const [labelsFile, recordsFile] = file0.name === 'labels.csv' ? [file0, file1] : [file1, file0]
+  readLabels(labelsFile, recordsFile)
+}
 </script>
 
 <template>
   <van-nav-bar :title="route.meta.title">
     <template #right>
-      <van-popover v-model:show="showUserPop" placement="bottom-end">
+      <van-popover v-model:show="userPopShow" placement="bottom-end">
         <div class="user-pop">
           <template v-if="userStore.user">
             <van-cell :title="userStore.user.displayName" icon="user" size="large" class="user-name" />
             <van-cell title="Export User Data" icon="down" @click="exportUserData" />
-            <van-cell title="Import User Data" icon="upgrade" />
-            <van-cell title="Sign Out" icon="exchange" @click="signOut(auth)" />
+            <van-cell title="Import User Data" icon="upgrade" @click="showImportPop"/>
+            <van-cell title="Sign Out" icon="exchange" @click="confirmSignOut" />
           </template>
           <van-cell v-else title="Sign In With Google" icon="home-o" @click="signInWithPopup(auth, provider)" />
         </div>
@@ -76,6 +172,12 @@ const exportUserData = async () => {
       </van-popover>
     </template>
   </van-nav-bar>
+  <van-popup v-model:show="importPopShow" :closeable="true" :close-on-click-overlay="false">
+    <div class="import-pop">
+      <van-uploader v-model="fileList" multiple :max-count="2" accept=".csv" upload-icon="plus" />
+      <van-button icon="upgrade" type="primary" :disabled="importDisabled" @click="confirmImport">Import</van-button>
+    </div>
+  </van-popup>
 </template>
 
 <style scoped>
@@ -96,5 +198,17 @@ const exportUserData = async () => {
   font-size: 1rem;
   line-height: 1.5rem;
   color: white;
+}
+
+.import-pop {
+  width: 50dvw;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.import-pop>div {
+  margin-top: 3rem;
 }
 </style>

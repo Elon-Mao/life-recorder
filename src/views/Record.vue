@@ -19,7 +19,6 @@ import {
   Icon as vanIcon,
 } from 'vant'
 import {
-  collection,
   doc,
   query,
   setDoc,
@@ -28,7 +27,6 @@ import {
   where,
   Unsubscribe
 } from 'firebase/firestore'
-import { db } from '@/config/firebase'
 import customPromise from '@/common/customPromise'
 import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
@@ -45,7 +43,7 @@ interface RecordForm extends Partial<RecordData> {
 
 const userStore = useUserStore()
 const labelStore = useLabelStore()
-const recordCollection = collection(db, `users/${userStore.user.uid}/records`)
+const recordCollection = userStore.getRecordsCollection()
 
 const getCurrentTimeParts = () => {
   const currentDate = new Date()
@@ -181,8 +179,9 @@ const onRecordConfirm = async () => {
   if (newRecord.id) {
     const promiseAll = [setDoc(doc(recordCollection, newRecord.id), data)]
     const oldLabelId = records.value.find((record) => record.id === newRecord.id)!.labelId!
-    if (oldLabelId !== newRecord.labelId) {
+    if (oldLabelId !== data.labelId) {
       promiseAll.push(labelStore.setRecordNum(oldLabelId, -1))
+      promiseAll.push(labelStore.setRecordNum(data.labelId, 1))
     }
     await customPromise(Promise.all(promiseAll))
   } else {

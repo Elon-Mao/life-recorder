@@ -1,9 +1,12 @@
 import router from '@/router'
 import { defineStore } from 'pinia'
-import { auth } from '@/config/firebase'
+import { auth, db } from '@/config/firebase'
 import { useSystemStore } from '@/stores/system'
 import { useLabelStore } from '@/stores/label'
 import type { User } from 'firebase/auth'
+import { collection } from 'firebase/firestore'
+
+const projectPath = '/life-recorder/infos/'
 
 export const useUserStore = defineStore('user', {
   state: () => {
@@ -30,6 +33,12 @@ export const useUserStore = defineStore('user', {
       router.push({ name: 'Home'})
       useLabelStore().init()
       success()
+    },
+    getLabelsCollection() {
+      return collection(db, `users/${this.user.uid}${projectPath}labels`)
+    },
+    getRecordsCollection() {
+      return collection(db, `users/${this.user.uid}${projectPath}records`)
     }
   },
 })

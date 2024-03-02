@@ -3,12 +3,12 @@ import { GoogleAuthProvider, getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDjdofGTzV90a5ysqdVCLGK7ozzTBu09WY",
-  authDomain: "life-recorder-elon.firebaseapp.com",
-  projectId: "life-recorder-elon",
-  storageBucket: "life-recorder-elon.appspot.com",
-  messagingSenderId: "768833236583",
-  appId: "1:768833236583:web:79b6fadf2c069939c96ec2"
+  apiKey: "AIzaSyAuSzFAheN1RRA3mX4lonvQpL9hTHaT_ws",
+  authDomain: "elon-firebase.firebaseapp.com",
+  projectId: "elon-firebase",
+  storageBucket: "elon-firebase.appspot.com",
+  messagingSenderId: "857112867232",
+  appId: "1:857112867232:web:88e76ba8c4ae9d9846b4c5"
 }
 
 const app = initializeApp(firebaseConfig)

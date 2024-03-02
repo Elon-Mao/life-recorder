@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import {
-  collection,
   doc,
   query,
   setDoc,
@@ -9,7 +8,6 @@ import {
   CollectionReference,
   DocumentData
 } from 'firebase/firestore'
-import { db } from '@/config/firebase'
 import customPromise from '@/common/customPromise'
 import { useUserStore } from './user'
 
@@ -28,8 +26,7 @@ export const useLabelStore = defineStore('labels', {
   },
   actions: {
     init() {
-      this.labelCollection = collection(db, `users/${useUserStore().user.uid}/labels`)
-      onSnapshot(query(this.labelCollection), (querySnapshot) => {
+      onSnapshot(query(useUserStore().getLabelsCollection()), (querySnapshot) => {
         this.labels = []
         querySnapshot.forEach((doc) => {
           this.labels.push({
@@ -42,10 +39,10 @@ export const useLabelStore = defineStore('labels', {
     },
     async setById(label: Label) {
       const { id, ...labelData } = label
-      await customPromise(setDoc(doc(this.labelCollection, id), labelData))
+      await customPromise(setDoc(doc(useUserStore().getLabelsCollection(), id), labelData))
     },
     async addEntity(label: Label) {
-      const newDoc = doc(this.labelCollection)
+      const newDoc = doc(useUserStore().getLabelsCollection())
       await this.setById({
         id: newDoc.id,
         ...label
@@ -53,7 +50,7 @@ export const useLabelStore = defineStore('labels', {
       return newDoc.id
     },
     async deleteById(id: string) {
-      await customPromise(deleteDoc(doc(this.labelCollection, id)))
+      await customPromise(deleteDoc(doc(useUserStore().getLabelsCollection(), id)))
     },
     async setRecordNum(id: string, addNum: number) {
       const label = {
@@ -62,5 +59,8 @@ export const useLabelStore = defineStore('labels', {
       label.recordNum += addNum
       await this.setById(label)
     },
+    async deleteAll() {
+      await Promise.all(this.labels.map((label) => deleteDoc(doc(useUserStore().getLabelsCollection(), label.id))))
+    }
   }
 })
