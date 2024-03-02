@@ -31,8 +31,8 @@ export const useUserStore = defineStore('user', {
 
       localStorage.setItem('user', JSON.stringify(user))
       router.push({ name: 'Home'})
-      useLabelStore().init()
       success()
+      useLabelStore().init()
     },
     getLabelsCollection() {
       return collection(db, `users/${this.user.uid}${projectPath}labels`)
