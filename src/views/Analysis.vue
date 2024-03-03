@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as echarts from 'echarts'
-import {
-  doc,
-  query,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  where,
-  Unsubscribe,
-  getDocs
-} from 'firebase/firestore'
-import { useUserStore } from '@/stores/user'
-import { useLabelStore } from '@/stores/label'
+// import {
+//   doc,
+//   query,
+//   setDoc,
+//   deleteDoc,
+//   onSnapshot,
+//   where,
+//   Unsubscribe,
+//   getDocs
+// } from 'firebase/firestore'
+// import { useUserStore } from '@/stores/user'
+// import { useLabelStore } from '@/stores/label'
 
-const userStore = useUserStore()
-const labelStore = useLabelStore()
-const recordCollection = userStore.getRecordsCollection()
+// const userStore = useUserStore()
+// const labelStore = useLabelStore()
+// const recordCollection = userStore.getRecordsCollection()
 
 const chartDom = ref(null)
 let myChart: echarts.EChartsType
