@@ -4,7 +4,11 @@ import AppFooter from '@/components/AppFooter.vue'
 
 <template>
   <div class="app-main">
-    <RouterView/>
+    <RouterView v-slot="{ Component }">
+      <KeepAlive>
+        <component :is="Component" />
+      </KeepAlive>
+    </RouterView>
   </div>
   <app-footer class="app-footer"></app-footer>
 </template>

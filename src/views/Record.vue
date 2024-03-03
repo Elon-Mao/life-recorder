@@ -28,18 +28,12 @@ import {
   Unsubscribe
 } from 'firebase/firestore'
 import customPromise from '@/common/customPromise'
+import convertToRecord from '@/common/convertToRecord'
 import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 import RecordData from '@/types/RecordData'
-
-interface RecordForm extends Partial<RecordData> {
-  labelName?: string
-  labelPicker: string[]
-  startTimeParts: string[]
-  endTimeParts: string[]
-  span?: number
-}
+import RecordForm from '@/types/RecordForm'
 
 const userStore = useUserStore()
 const labelStore = useLabelStore()
@@ -212,28 +206,6 @@ const onDateConfirm = (value: Date) => {
   recordsDate.value = value
   onDateChange()
   showCalendar.value = false
-}
-
-const calculateLabelName = (record: RecordForm) => {
-  record.labelName = labelStore.labels.find((label) => label.id === record.labelId)!.labelName
-}
-
-const calculateSpan = (record: RecordForm) => {
-  const startTimeMinutes = Number(record.startTimeParts![0]) * 60 + Number(record.startTimeParts![1])
-  const endTimeMinutes = Number(record.endTimeParts![0]) * 60 + Number(record.endTimeParts![1])
-  record.span = endTimeMinutes - startTimeMinutes
-}
-
-const convertToRecord = (recordData: RecordData): RecordForm => {
-  const record = {
-    ...recordData,
-    labelPicker: [recordData.labelId],
-    startTimeParts: recordData.startTime.split(':'),
-    endTimeParts: recordData.endTime.split(':')
-  }
-  calculateLabelName(record)
-  calculateSpan(record)
-  return record
 }
 
 let recordsDate = ref(new Date())

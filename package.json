@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "echarts": "^5.5.0",
     "firebase": "^10.6.0",
     "pinia": "^2.1.7",
     "vant": "^4.8.1",
