@@ -8,7 +8,8 @@ import {
   Form as VanForm,
   Field as VanField,
   TextEllipsis as VanTextEllipsis,
-  showConfirmDialog
+  showConfirmDialog,
+  showNotify,
 } from 'vant'
 import { Label, useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
@@ -35,14 +36,17 @@ const actions = computed<VanAction[]>(() => [{
 }, {
   name: 'delete',
   execute: async () => {
+    if (editingLabel.value.recordNum > 0) {
+      showNotify('Please delete relevant records first')
+      return
+    }
     await showConfirmDialog({
       message: 'Data will not be able to recover'
     })
     await labelStore.deleteById(editingLabel.value.id!)
     showAction.value = false
   },
-  color: editingLabel.value.recordNum ? '': '#ee0a24',
-  disabled: !!editingLabel.value.recordNum
+  color: '#ee0a24',
 }])
 const onActionSelect = (item: VanAction) => {
   item.execute()
