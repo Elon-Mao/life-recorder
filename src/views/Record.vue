@@ -221,6 +221,7 @@ const onDateChange = () => {
   if (unsubscribe) {
     unsubscribe()
   }
+  records.value = []
   unsubscribe = onSnapshot(query(recordCollection, where('date', '==', recordsDateStr.value)), (querySnapshot) => {
     records.value = []
     querySnapshot.forEach((doc) => {
