@@ -1,104 +1,119 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as echarts from 'echarts'
-// import {
-//   doc,
-//   query,
-//   setDoc,
-//   deleteDoc,
-//   onSnapshot,
-//   where,
-//   Unsubscribe,
-//   getDocs
-// } from 'firebase/firestore'
-// import { useUserStore } from '@/stores/user'
+import {
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore'
+import { useUserStore } from '@/stores/user'
 // import { useLabelStore } from '@/stores/label'
+import { calculateSpan } from '@/common/convertToRecord'
+import RecordForm from '@/types/RecordForm'
+import { dayMills, getDaysDifference, getFormatDate } from '@/common/dateTools'
 
-// const userStore = useUserStore()
+const userStore = useUserStore()
 // const labelStore = useLabelStore()
-// const recordCollection = userStore.getRecordsCollection()
+const recordCollection = userStore.getRecordsCollection()
 
-const chartDom = ref(null)
-let myChart: echarts.EChartsType
-let minWidth = 0
+const legendDom = ref(null)
+const gridDom = ref(null)
+let chartLegend: echarts.EChartsType
+let chartGrid: echarts.EChartsType
 onMounted(() => {
-  myChart = echarts.init(chartDom.value)
-  minWidth = myChart.getWidth()
+  chartLegend = echarts.init(legendDom.value)
+  chartGrid = echarts.init(gridDom.value)
   loadChart()
 })
 
+interface LabelSet {
+  name: string,
+  labels: string[]
+  dateSpanMap: Record<string, number>
+  dateSpans: [string?, number?][]
+}
+
 const loadChart = async () => {
-  // const labelSets = [{
-  //   name: 'Studying English',
-  //   labels: ['AS44HIQqRwzV6kCej2rE', 'vI2mPDqbYFafcq58DqVB']
-  // }, {
-  //   name: 'Coding English',
-  //   labels: ['sONqEVfWPxMMpkfRk6dw', 'EvMZueaN14DkvKe4fZBn', 'mzhn1hVEPTSatWdyCy2f', 'LKUwkiPELOgdpYWYlCgq']
-  // }]
-  // for (const labelSet of labelSets) {
-  //   for (const labelId of labelSet.labels) {
-  //       await getDocs(query(recordCollection, where('labelId', '==', labelId)))
-  //   }
-  // }
+  const labelSets: LabelSet[] = [{
+    name: 'Studying English',
+    labels: ['AS44HIQqRwzV6kCej2rE', 'vI2mPDqbYFafcq58DqVB'],
+    dateSpanMap: {},
+    dateSpans: []
+  }, {
+    name: 'Coding English',
+    labels: ['sONqEVfWPxMMpkfRk6dw', 'EvMZueaN14DkvKe4fZBn', 'mzhn1hVEPTSatWdyCy2f', 'LKUwkiPELOgdpYWYlCgq'],
+    dateSpanMap: {},
+    dateSpans: []
+  }]
 
-  // There should not be negative values in rawData
-  // const rawData = [
-  //   [100, 302, 301, 334, 390, 330, 320, 20, 20],
-  //   [320, 132, 101, 134, 90, 230, 210, 20, 20],
-  //   [220, 182, 191, 234, 290, 330, 310, 20, 20],
-  //   [50, 2, 1, 54, 90, 30, 10, 20, 20],
-  //   [20, 32, 1, 34, 90, 30, 20, 20, 20]
-  // ]
-  // const totalData: number[] = []
-  // for (let i = 0; i < rawData[0].length; ++i) {
-  //   let sum = 0
-  //   for (let j = 0; j < rawData.length; ++j) {
-  //     sum += rawData[j][i]
-  //   }
-  //   totalData.push(sum)
-  // }
-  const rawData = [
-    [['2024-02-28 12:00', 100], ['2024-02-27 12:00', 100], ['2024-02-26 12:00', 100], ['2024-02-25 12:00', 100]
-    , ['2024-02-24 12:00', 100], ['2024-02-23 12:00', 100], ['2024-02-22 12:00', 100], ['2024-02-20 12:00', 100]
-    , ['2024-02-19 12:00', 100], ['2024-02-18 12:00', 100], ['2024-02-17 12:00', 100], ['2024-02-16 12:00', 100]]
-  ]
-
-  const series: echarts.BarSeriesOption[] = [
-    'Direct',
-    // 'Mail Ad',
-    // 'Affiliate Ad',
-    // 'Video Ad',
-    // 'Search Engine'
-  ].map((name, sid) => {
-    return {
-      name,
-      type: 'bar',
-      stack: 'total',
-      barWidth: '80%',
-      label: {
-        show: true,
-        formatter: '44.4%'
-      },
-      // label: {
-      //   show: true,
-      //   formatter: (params: any) => Math.round(params.value * 1000 / totalData[params.dataIndex]) / 10 + '%'
-      // },
-      data: rawData[sid]
+  let maxDateStr = '1970/01/01'
+  let minDateStr = getFormatDate(new Date())
+  for (const labelSet of labelSets) {
+    for (const labelId of labelSet.labels) {
+      const querySnapshot = await getDocs(query(recordCollection, where('labelId', '==', labelId)))
+      querySnapshot.forEach(async (document) => {
+        const recordForm = document.data() as RecordForm
+        recordForm.startTimeParts = recordForm.startTime!.split(':')
+        recordForm.endTimeParts = recordForm.endTime!.split(':')
+        calculateSpan(recordForm)
+        const date = recordForm.date!
+        if (date > maxDateStr) {
+          maxDateStr = date
+        }
+        if (date < minDateStr) {
+          minDateStr = date
+        }
+        let dateSpan = labelSet.dateSpanMap[date]
+        if (!dateSpan) {
+          dateSpan = 0
+        }
+        labelSet.dateSpanMap[date] = dateSpan + recordForm.span!
+      })
     }
+  }
+  const maxDate = new Date(maxDateStr)
+  const minDate = new Date(minDateStr)
+  let loopDate = new Date(minDate)
+  while (loopDate <= maxDate) {
+    const formatDate = getFormatDate(loopDate)
+    labelSets.forEach((labelSet) => {
+      const dateSpan = labelSet.dateSpanMap[formatDate]
+      labelSet.dateSpans.push(dateSpan ? [`${formatDate} 12`, dateSpan] : [])
+    })
+    loopDate.setDate(loopDate.getDate() + 1)
+  }
+  maxDate.setDate(maxDate.getDate() + 1)
+
+  chartLegend.setOption({
+    legend: {
+      type: 'scroll',
+      selectedMode: false
+    },
+    grid: {
+      width: 0,
+      height: 0
+    },
+    yAxis: {
+    },
+    xAxis: {
+    },
+    series: labelSets.map((labelSet) => {
+      return {
+        name: labelSet.name,
+        type: 'bar'
+      }
+    })
   })
 
-  myChart.resize({
-    width: Math.max(minWidth, 16 * 50),
+  chartGrid.resize({
+    width: (getDaysDifference(maxDate, minDate) + 4) * 50,
   })
-  myChart.setOption({
-    legend: {
-      type: 'scroll'
-    },
+  chartGrid.setOption({
     grid: {
       left: 50,
       right: 0,
-      top: 50,
-      bottom: 50
+      top: 20,
+      bottom: 20
     },
     yAxis: {
       type: 'value'
@@ -108,30 +123,50 @@ const loadChart = async () => {
       axisLabel: {
         formatter: '{MM}-{dd}'
       },
-      minInterval: 3600 * 24 * 1000,
-      maxInterval: 3600 * 24 * 1000,
-      min: new Date('2024-02-15'),
-      max: new Date('2024-02-29')
-      // data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Sun', 'Sun']
+      minInterval: dayMills,
+      maxInterval: dayMills,
+      min: minDate.getTime(),
+      max: maxDate.getTime(),
     },
-    series,
+    series: labelSets.map((labelSet) => {
+      return {
+        name: labelSet.name,
+        type: 'bar',
+        stack: 'span',
+        barWidth: '80%',
+        label: {
+          show: true,
+          formatter: '44.4%'
+        },
+        // label: {
+        //   show: true,
+        //   formatter: (params: any) => Math.round(params.value * 1000 / totalData[params.dataIndex]) / 10 + '%'
+        // },
+        data: labelSet.dateSpans
+      }
+    })
   })
 }
 </script>
 
 <template>
-  <div class="chart-container">
-    <div class="analysis-chart" ref="chartDom"></div>
+  <div class="chart-legend" ref="legendDom"></div>
+  <div class="grid-container">
+    <div class="chart-grid" ref="gridDom"></div>
   </div>
 </template>
 
 <style scoped>
-.chart-container {
+.chart-legend {
+  min-width: 100dvw;
+  height: 28px;
+}
+
+.grid-container {
   overflow: auto;
 }
 
-.analysis-chart {
-  min-width: 100dvw;
+.chart-grid {
   height: 50dvh;
 }
 </style>

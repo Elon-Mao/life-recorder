@@ -34,6 +34,7 @@ import { useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 import RecordData from '@/types/RecordData'
 import RecordForm from '@/types/RecordForm'
+import { getFormatDate } from '@/common/dateTools'
 
 const userStore = useUserStore()
 const labelStore = useLabelStore()
@@ -213,7 +214,7 @@ const recordsDateStr = ref('')
 const records = ref<RecordForm[]>([])
 let unsubscribe: Unsubscribe
 const onDateChange = () => {
-  const newDateStr = `${recordsDate.value.getFullYear()}/${String(recordsDate.value.getMonth() + 1).padStart(2, '0')}/${String(recordsDate.value.getDate()).padStart(2, '0')}`
+  const newDateStr = getFormatDate(recordsDate.value)
   if (newDateStr === recordsDateStr.value) {
     return
   }
