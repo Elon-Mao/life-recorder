@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onActivated } from 'vue'
 import * as echarts from 'echarts'
 import {
   query,
@@ -10,27 +10,27 @@ import { useUserStore } from '@/stores/user'
 // import { useLabelStore } from '@/stores/label'
 import { calculateSpan } from '@/common/convertToRecord'
 import RecordForm from '@/types/RecordForm'
-import { dayMills, getDaysDifference, getFormatDate } from '@/common/dateTools'
+import { dayMills, getFormatDate } from '@/common/dateTools'
+import { CallbackDataParams } from 'echarts/types/dist/shared.js'
 
 const userStore = useUserStore()
 // const labelStore = useLabelStore()
 const recordCollection = userStore.getRecordsCollection()
 
-const legendDom = ref(null)
 const gridDom = ref(null)
-let chartLegend: echarts.EChartsType
 let chartGrid: echarts.EChartsType
-onMounted(() => {
-  chartLegend = echarts.init(legendDom.value)
+onActivated(() => {
   chartGrid = echarts.init(gridDom.value)
   loadChart()
 })
+
+declare type spanData = [string?, number?]
 
 interface LabelSet {
   name: string,
   labels: string[]
   dateSpanMap: Record<string, number>
-  dateSpans: [string?, number?][]
+  dateSpans: spanData[]
 }
 
 const loadChart = async () => {
@@ -40,7 +40,7 @@ const loadChart = async () => {
     dateSpanMap: {},
     dateSpans: []
   }, {
-    name: 'Coding English',
+    name: 'Coding',
     labels: ['sONqEVfWPxMMpkfRk6dw', 'EvMZueaN14DkvKe4fZBn', 'mzhn1hVEPTSatWdyCy2f', 'LKUwkiPELOgdpYWYlCgq'],
     dateSpanMap: {},
     dateSpans: []
@@ -74,59 +74,62 @@ const loadChart = async () => {
   const maxDate = new Date(maxDateStr)
   const minDate = new Date(minDateStr)
   let loopDate = new Date(minDate)
+  const dateSums: number[] = []
   while (loopDate <= maxDate) {
     const formatDate = getFormatDate(loopDate)
+    let dateSum = 0
     labelSets.forEach((labelSet) => {
       const dateSpan = labelSet.dateSpanMap[formatDate]
-      labelSet.dateSpans.push(dateSpan ? [`${formatDate} 12`, dateSpan] : [])
+      if (dateSpan) {
+        dateSum += dateSpan
+        labelSet.dateSpans.push([`${formatDate} 12`, dateSpan])
+      } else {
+        labelSet.dateSpans.push([])
+      }
     })
+    dateSums.push(dateSum)
     loopDate.setDate(loopDate.getDate() + 1)
   }
   maxDate.setDate(maxDate.getDate() + 1)
+  minDate.setDate(minDate.getDate() - 1)
 
-  chartLegend.setOption({
+  const startDate = new Date(maxDate)
+  startDate.setDate(startDate.getDate() - 7)
+  chartGrid.setOption({
+    dataZoom: [{
+      type: 'inside',
+      zoomLock: true,
+      startValue: startDate,
+      filterMode: 'none',
+    }],
     legend: {
       type: 'scroll',
       selectedMode: false
     },
     grid: {
-      width: 0,
-      height: 0
-    },
-    yAxis: {
-    },
-    xAxis: {
-    },
-    series: labelSets.map((labelSet) => {
-      return {
-        name: labelSet.name,
-        type: 'bar'
-      }
-    })
-  })
-
-  chartGrid.resize({
-    width: (getDaysDifference(maxDate, minDate) + 4) * 50,
-  })
-  chartGrid.setOption({
-    grid: {
-      left: 50,
+      left: 0,
       right: 0,
-      top: 20,
-      bottom: 20
-    },
-    yAxis: {
-      type: 'value'
     },
     xAxis: {
       type: 'time',
       axisLabel: {
-        formatter: '{MM}-{dd}'
+        formatter: '{MM}-{dd}',
+        align: 'left'
       },
       minInterval: dayMills,
       maxInterval: dayMills,
       min: minDate.getTime(),
       max: maxDate.getTime(),
+    },
+    yAxis: {
+      type: 'value',
+      offset: -50,
+      zlevel: 1,
+      axisLabel: {
+        color: 'blue',
+        textBorderColor: 'blue',
+        textBorderWidth: 1,
+      }
     },
     series: labelSets.map((labelSet) => {
       return {
@@ -136,12 +139,15 @@ const loadChart = async () => {
         barWidth: '80%',
         label: {
           show: true,
-          formatter: '44.4%'
+          formatter: (params: CallbackDataParams) => {
+            const spanDate = params.value as spanData
+            if (spanDate.length) {
+              return Math.round(spanDate[1]! * 1000 / dateSums[params.dataIndex]) / 10 + '%'
+            } else {
+              return ''
+            }
+          }
         },
-        // label: {
-        //   show: true,
-        //   formatter: (params: any) => Math.round(params.value * 1000 / totalData[params.dataIndex]) / 10 + '%'
-        // },
         data: labelSet.dateSpans
       }
     })
@@ -150,23 +156,12 @@ const loadChart = async () => {
 </script>
 
 <template>
-  <div class="chart-legend" ref="legendDom"></div>
-  <div class="grid-container">
-    <div class="chart-grid" ref="gridDom"></div>
-  </div>
+  <div class="chart-grid" ref="gridDom"></div>
 </template>
 
 <style scoped>
-.chart-legend {
-  min-width: 100dvw;
-  height: 28px;
-}
-
-.grid-container {
-  overflow: auto;
-}
-
 .chart-grid {
+  width: 100dvw;
   height: 50dvh;
 }
 </style>
