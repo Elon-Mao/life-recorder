@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onActivated } from 'vue'
+import { ref, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import {
   query,
@@ -19,7 +19,7 @@ const recordCollection = userStore.getRecordsCollection()
 
 const gridDom = ref(null)
 let chartGrid: echarts.EChartsType
-onActivated(() => {
+onMounted(() => {
   chartGrid = echarts.init(gridDom.value)
   loadChart()
 })
@@ -46,7 +46,6 @@ const loadChart = async () => {
     dateSpans: []
   }]
 
-  let maxDateStr = '1970/01/01'
   let minDateStr = getFormatDate(new Date())
   for (const labelSet of labelSets) {
     for (const labelId of labelSet.labels) {
@@ -57,9 +56,6 @@ const loadChart = async () => {
         recordForm.endTimeParts = recordForm.endTime!.split(':')
         calculateSpan(recordForm)
         const date = recordForm.date!
-        if (date > maxDateStr) {
-          maxDateStr = date
-        }
         if (date < minDateStr) {
           minDateStr = date
         }
@@ -71,7 +67,7 @@ const loadChart = async () => {
       })
     }
   }
-  const maxDate = new Date(maxDateStr)
+  const maxDate = new Date()
   const minDate = new Date(minDateStr)
   let loopDate = new Date(minDate)
   const dateSums: number[] = []
@@ -90,9 +86,9 @@ const loadChart = async () => {
     dateSums.push(dateSum)
     loopDate.setDate(loopDate.getDate() + 1)
   }
-  maxDate.setDate(maxDate.getDate() + 1)
   minDate.setDate(minDate.getDate() - 1)
 
+  maxDate.setHours(24)
   const startDate = new Date(maxDate)
   startDate.setDate(startDate.getDate() - 7)
   chartGrid.setOption({
@@ -100,6 +96,7 @@ const loadChart = async () => {
       type: 'inside',
       zoomLock: true,
       startValue: startDate,
+      endValue: maxDate,
       filterMode: 'none',
     }],
     legend: {
@@ -123,9 +120,11 @@ const loadChart = async () => {
     },
     yAxis: {
       type: 'value',
-      offset: -50,
+      offset: -80,
       zlevel: 1,
       axisLabel: {
+        showMinLabel: false,
+        formatter: '{value} min',
         color: 'blue',
         textBorderColor: 'blue',
         textBorderWidth: 1,
@@ -142,7 +141,7 @@ const loadChart = async () => {
           formatter: (params: CallbackDataParams) => {
             const spanDate = params.value as spanData
             if (spanDate.length) {
-              return Math.round(spanDate[1]! * 1000 / dateSums[params.dataIndex]) / 10 + '%'
+              return `${spanDate[1]}min\n${Math.round(spanDate[1]! * 1000 / dateSums[params.dataIndex]) / 10}%`
             } else {
               return ''
             }
