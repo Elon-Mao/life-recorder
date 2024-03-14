@@ -7,7 +7,6 @@ import {
   Dialog as VanDialog,
   Form as VanForm,
   Field as VanField,
-  TextEllipsis as VanTextEllipsis,
   showConfirmDialog,
   showNotify,
 } from 'vant'
@@ -54,7 +53,7 @@ const onActionSelect = (item: VanAction) => {
 
 const showLabelEditor = () => {
   labelForm.value?.resetValidation()
-  showEditor.value = true 
+  showEditor.value = true
 }
 
 const labelOnClick = (label: Label) => {
@@ -97,11 +96,8 @@ const uniqueValidator = () => {
 
 <template>
   <div class="label-list">
-    <van-cell v-for="label in labelStore.labels" :key="label.id" is-link :label="`Record number: ${label.recordNum}`" @click="labelOnClick(label)">
-      <template #title>
-        <van-text-ellipsis :content="label.labelName" />
-      </template>
-    </van-cell>
+    <van-cell v-for="label in labelStore.labels" :key="label.id" is-link :label="`Record number: ${label.recordNum}`"
+      @click="labelOnClick(label)" :title="label.labelName" title-class="text-ellipsis" />
   </div>
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-icon name="add" color="#1989fa" size="3rem" class="add-label-icon" @click="addLable" />

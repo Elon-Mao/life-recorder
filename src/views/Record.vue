@@ -5,7 +5,6 @@ import {
   Calendar as VanCalendar,
   Cell as VanCell,
   Button as VanButton,
-  TextEllipsis as VanTextEllipsis,
   Popup as VanPopup,
   PickerGroup as VanPickerGroup,
   Picker as VanPicker,
@@ -186,7 +185,7 @@ const onRecordConfirm = async () => {
       labelStore.setRecordNum(data.labelId, 1)
     ]))
   }
-  
+
   showPickerGroup.value = false
   showNotify({ type: 'success', message: 'Add Success' })
 }
@@ -272,10 +271,8 @@ if (labelStore.labels.length) {
         </div>
       </template>
     </van-cell>
-    <van-cell v-for="record in records" :key="record.id" is-link center @click="recordOnClick(record)">
-      <template #title>
-        <van-text-ellipsis :content="record.labelName" />
-      </template>
+    <van-cell v-for="record in records" :key="record.id" is-link center @click="recordOnClick(record)"
+      :title="record.labelName" title-class="text-ellipsis">
       <template #label>
         <div class="span-info">
           <span>{{ `${record.startTime}~${record.endTime}` }}</span>
@@ -286,7 +283,7 @@ if (labelStore.labels.length) {
     </van-cell>
   </div>
   <van-calendar v-model:show="showCalendar" :round="false" position="top" :min-date="new Date('2023/01/01')"
-    @confirm="onDateConfirm" :default-date="recordsDate"/>
+    @confirm="onDateConfirm" :default-date="recordsDate" />
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
     <van-picker-group :tabs="pickerTabs" v-model:active-tab="activeTab" @cancel="showPickerGroup = false"

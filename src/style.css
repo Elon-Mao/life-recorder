@@ -31,3 +31,9 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+.text-ellipsis {
+  overflow: hidden;
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
+}
