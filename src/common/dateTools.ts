@@ -4,6 +4,8 @@ export const getFormatDate = (date: Date) => {
 
 export const dayMills = 1000 * 60 * 60 * 24
 
+export const mintues30 = 1000 * 60 * 30
+
 export const getDaysDifference = (date0: Date, date1: Date) => {
   return Math.round(Math.abs(date0.getTime() - date1.getTime()) / dayMills)
 }

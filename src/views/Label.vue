@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Icon as VanIcon,
   Cell as VanCell,
@@ -13,6 +14,7 @@ import {
 import { Label, useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 
+const router = useRouter()
 const labelStore = useLabelStore()
 const labelForm = ref()
 const initLabel = {
@@ -31,6 +33,16 @@ const actions = computed<VanAction[]>(() => [{
   execute: () => {
     showAction.value = false
     showLabelEditor()
+  }
+}, {
+  name: 'analyse',
+  execute: async () => {
+    await router.push({
+      path: '/home/analysis', query: {
+        labelId: editingLabel.value.id
+      }
+    })
+    showAction.value = false
   }
 }, {
   name: 'delete',
