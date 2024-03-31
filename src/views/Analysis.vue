@@ -15,7 +15,7 @@ import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
 import { calculateSpan } from '@/common/convertToRecord'
 import RecordForm from '@/types/RecordForm'
-import { dayMills, getFormatDate, mintues30 } from '@/common/dateTools'
+import { dayMills, getFormatDate } from '@/common/dateTools'
 import { CallbackDataParams } from 'echarts/types/dist/shared.js'
 
 const route = useRoute()
@@ -49,6 +49,11 @@ interface LabelSet {
   labels: string[]
   dateSpanMap: Record<string, number>
   dateSpans: spanData[]
+}
+
+interface DateRecordGroup {
+  date: string
+  records: RecordForm[]
 }
 
 const loadMultiChart = async () => {
@@ -173,197 +178,213 @@ const loadMultiChart = async () => {
 const getRecords = async (labelId: string) => {
   const querySnapshot = await getDocs(query(recordCollection, where('labelId', '==', labelId)))
   const records: RecordForm[] = []
+  const minDate = new Date()
+  minDate.setDate(minDate.getDate() - 7)
+  let minDateStr = getFormatDate(minDate)
   querySnapshot.forEach((document) => {
     const recordForm = document.data() as RecordForm
     recordForm.startTimeParts = recordForm.startTime!.split(':')
     recordForm.endTimeParts = recordForm.endTime!.split(':')
     calculateSpan(recordForm)
+    const date = recordForm.date!
+    if (date < minDateStr) {
+      minDateStr = date
+    }
     records.push(recordForm)
   })
-  return records
-}
-
-const getTypeOption = () => {
-  const labelId = route.query.labelId as string
-  const name = labelStore.labels.find((label) => label.id === labelId)!.labelName
-  switch (chartType.value) {
-    case '1':
-      return {
-        yAxis: {
-          type: 'value',
-          offset: -80,
-          zlevel: 1,
-          axisLabel: {
-            showMinLabel: false,
-            formatter: '{value} min',
-            color: 'blue',
-            textBorderColor: 'blue',
-            textBorderWidth: 1,
-          }
-        },
-        series: {
-          name,
-          type: 'bar',
-          barWidth: '80%',
-          data: labelRecords.map((record) => {
-            return [`${record.date} 12`, record.span]
-          })
-        }
-      }
-    case '2':
-      const maxDate = new Date()
-      const startDate = new Date()
-      maxDate.setDate(maxDate.getDate() + 10)
-      startDate.setDate(startDate.getDate() - 120)
-      return {
-        dataZoom: [{
-          type: 'inside',
-          zoomLock: true,
-          startValue: startDate,
-          endValue: maxDate,
-          filterMode: 'none',
-        }],
-        xAxis: {
-          type: 'time',
-          axisLine: {
-            show: true,
-          },
-          axisTick: {
-            show: true,
-          },
-          min: ({ min }: { min: number }) => Math.min(startDate.getTime(), min - dayMills * 10),
-          max: maxDate,
-        },
-        yAxis: {
-          type: 'time',
-          offset: -50,
-          zlevel: 1,
-          min: ({ min }: { min: number }) => {
-            return min - mintues30
-          },
-          max: 'dataMax',
-          axisLabel: {
-            formatter: '{HH}:{mm}',
-            color: 'blue',
-            textBorderColor: 'blue',
-            textBorderWidth: 1,
-          }
-        },
-        series: {
-          name,
-          type: 'scatter',
-          data: labelRecords.map((record) => {
-            return [record.date, new Date('1970/01/01 ' + record.startTime)]
-          })
-        }
-      }
-    case '3':
-      return {
-        yAxis: {
-          type: 'value',
-          name: 'Times',
-          nameTextStyle: {
-            color: 'blue',
-            textBorderColor: 'blue',
-            textBorderWidth: 1,
-          },
-          offset: -30,
-          zlevel: 1,
-          minInterval: 1,
-          min: 0,
-          max: 'dataMax',
-          axisLabel: {
-            showMinLabel: false,
-            color: 'blue',
-            textBorderColor: 'blue',
-            textBorderWidth: 1,
-          }
-        },
-        series: {
-          name,
-          type: 'bar',
-          data: labelRecords.reduce((recordGroup: RecordForm[][], record) => {
-            const foundGroup = recordGroup.find(group => group[0].date === record.date)
-            if (foundGroup) {
-              foundGroup.push(record)
-            } else {
-              recordGroup.push([record])
-            }
-            return recordGroup
-          }, []).map((group) => {
-            return [`${group[0].date} 12`, group.length]
-          })
-        }
-      }
-  }
-  return {}
-}
-
-const loadChartByType = async () => {
   const maxDate = new Date()
-  const minDate = new Date(recordMinDate)
-  minDate.setDate(minDate.getDate() - 1)
-  maxDate.setHours(24)
-  const startDate = new Date(maxDate)
-  startDate.setDate(startDate.getDate() - 7)
-
-  chartGrid.clear()
-  const commonOption = {
-    dataZoom: [{
-      type: 'inside',
-      zoomLock: true,
-      startValue: startDate,
-      endValue: maxDate,
-      filterMode: 'none',
-    }],
-    legend: {
-      selectedMode: false
-    },
-    grid: {
-      left: 0,
-      right: 0,
-    },
-    xAxis: {
-      type: 'time',
-      axisLabel: {
-        formatter: '{MM}-{dd}',
-        align: 'left'
-      },
-      minInterval: dayMills,
-      maxInterval: dayMills,
-      min: minDate.getTime(),
-      max: maxDate.getTime(),
-    },
+  const dateRecordGroups = []
+  for (let date = new Date(minDateStr); date <= maxDate; date.setDate(date.getDate() + 1)) {
+    const dateString = getFormatDate(date)
+    const recordGroup = []
+    for (let i = records.length - 1; i >= 0; i--) {
+      if (records[i].date === dateString) {
+        recordGroup.push(records.splice(i, 1)[0])
+      }
+    }
+    dateRecordGroups.push({ date: dateString, records: recordGroup })
   }
+  return dateRecordGroups
+}
 
-  chartGrid.setOption({
-    ...commonOption,
-    ...getTypeOption()
-  })
+const chartOption: echarts.EChartsOption = {
+  dataZoom: {
+    type: 'inside',
+    zoomLock: true,
+    filterMode: 'none',
+  },
+  legend: {
+    selectedMode: false
+  },
+  grid: {
+    left: 40,
+    bottom: 25,
+  },
+}
+
+const onOptionsChange = () => {
+  let seriesGroups = labelRecordGroups
+  switch (timeCycle.value) {
+    case 7: {
+      seriesGroups = []
+      if (!labelRecordGroups.length) {
+        break
+      }
+      const minDate = new Date(labelRecordGroups[0].date)
+      let index = minDate.getDay() - 1
+      if (index) {
+        const lastMonday = new Date(minDate)
+        lastMonday.setDate(minDate.getDate() - index)
+        const group: DateRecordGroup = {
+          date: getFormatDate(lastMonday),
+          records: []
+        }
+        for (let i = 0; i < 7 - index; i++) {
+          if (i > labelRecordGroups.length - 1) {
+            break
+          }
+          group.records.push(...labelRecordGroups[i].records)
+        }
+        seriesGroups.push(group)
+        index = 7 - index
+      }
+      while (index < labelRecordGroups.length) {
+        const group: DateRecordGroup = {
+          date: labelRecordGroups[index].date,
+          records: []
+        }
+        for (let i = 0; i < 7; i++, index++) {
+          if (index > labelRecordGroups.length - 1) {
+            break
+          }
+          group.records.push(...labelRecordGroups[index].records)
+        }
+        seriesGroups.push(group)
+      }
+      break
+    }
+    case 30: {
+      seriesGroups = []
+      if (!labelRecordGroups.length) {
+        break
+      }
+      let monthGroup: DateRecordGroup = {
+        date: labelRecordGroups[0].date.slice(0, 7),
+        records: []
+      }
+      seriesGroups.push(monthGroup)
+      for (const recordGroup of labelRecordGroups) {
+        const date = recordGroup.date.slice(0, 7)
+        if (date !== monthGroup.date) {
+          monthGroup = {
+            date,
+            records: []
+          }
+          seriesGroups.push(monthGroup)
+        }
+        monthGroup.records.push(...recordGroup.records)
+      }
+      break
+    }
+  }
+  switch (chartType.value) {
+    case '1': {
+      const xData = seriesGroups.map((dateRecordGroup) => dateRecordGroup.date)
+      chartOption.xAxis = {
+        type: 'category',
+        data: xData
+      }
+      chartOption.dataZoom = {
+        ...chartOption.dataZoom,
+        startValue: Math.max(0, xData.length - 7),
+        endValue: xData.length - 1
+      }
+      chartOption.yAxis = {
+        type: 'value',
+        name: 'minutes',
+      }
+      chartOption.series = {
+        name: labelName,
+        type: 'bar',
+        barWidth: '80%',
+        data: seriesGroups.map((recordGroup) => {
+          return recordGroup.records.reduce((sumSpan, record) => sumSpan + record.span!, 0)
+        })
+      }
+      break
+    }
+    case '2':
+      chartOption.xAxis = {
+        type: 'category',
+        data: labelRecordGroups.map((dateRecordGroup) => dateRecordGroup.date)
+      }
+      chartOption.dataZoom = {
+        ...chartOption.dataZoom,
+        startValue: Math.max(0, labelRecordGroups.length - 7 * timeCycle.value),
+        endValue: labelRecordGroups.length - 1
+      }
+      chartOption.yAxis = {
+        type: 'time',
+      }
+      chartOption.series = {
+        name: labelName,
+        type: 'scatter',
+        data: seriesGroups.reduce((allRecords: [string, Date][], seriesGroup) => {
+          return allRecords.concat(seriesGroup.records.map((record) => [record.date!, new Date('1970/01/01 ' + record.startTime)]))
+        }, [])
+      }
+      break
+    case '3': {
+      const xData = seriesGroups.map((dateRecordGroup) => dateRecordGroup.date)
+      chartOption.xAxis = {
+        type: 'category',
+        data: xData
+      }
+      chartOption.dataZoom = {
+        ...chartOption.dataZoom,
+        startValue: Math.max(0, xData.length - 7),
+        endValue: xData.length - 1
+      }
+      chartOption.yAxis = {
+        type: 'value',
+        minInterval: 1,
+        name: 'times',
+      }
+      chartOption.series = {
+        name: labelName,
+        type: 'bar',
+        barWidth: '80%',
+        data: seriesGroups.map((recordGroup) => recordGroup.records.length)
+      }
+      break
+    }
+  }
+  chartGrid.clear()
+  chartGrid.setOption(chartOption)
 }
 
 const loadSingleChart = async () => {
   const labelId = route.query.labelId as string
-  labelRecords = await getRecords(labelId)
-  recordMinDate = getFormatDate(new Date())
-  for (const record of labelRecords) {
-    const date = record.date!
-    if (date < recordMinDate) {
-      recordMinDate = date
-    }
-  }
-  loadChartByType()
+  labelRecordGroups = await getRecords(labelId)
+  labelName = labelStore.labels.find((label) => label.id === labelId)!.labelName
+  onOptionsChange()
 }
 
 const chartType = ref('1')
-let labelRecords: RecordForm[] = []
-let recordMinDate = ''
+let labelRecordGroups: DateRecordGroup[] = []
+let labelName = ''
+const timeCycle = ref(1)
 </script>
 
 <template>
   <div class="chart-container">
     <div class="chart-grid" ref="gridDom"></div>
-    <van-radio-group v-model="chartType" direction="horizontal" :onChange="loadChartByType">
+    <van-radio-group class="chart-radio-group" v-model="timeCycle" direction="horizontal" :onChange="onOptionsChange">
+      <van-radio :name=1>Daily</van-radio>
+      <van-radio :name=7>Weekly</van-radio>
+      <van-radio :name=30>Monthly</van-radio>
+    </van-radio-group>
+    <van-radio-group class="chart-radio-group" v-model="chartType" direction="horizontal" :onChange="onOptionsChange">
       <van-radio name="1">Time Span</van-radio>
       <van-radio name="2">Start Time</van-radio>
       <van-radio name="3">Record Num</van-radio>
@@ -381,5 +402,16 @@ let recordMinDate = ''
 .chart-grid {
   width: 100dvw;
   height: 50dvh;
+}
+
+.chart-radio-group {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px;
+}
+
+.chart-radio-group>* {
+  margin: 0;
+  flex: 1;
 }
 </style>
