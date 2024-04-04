@@ -217,7 +217,7 @@ const chartOption: echarts.EChartsOption = {
     selectedMode: false
   },
   grid: {
-    left: 40,
+    left: 45,
     bottom: 25,
   },
 }

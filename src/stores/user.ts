@@ -6,7 +6,7 @@ import { useLabelStore } from '@/stores/label'
 import type { User } from 'firebase/auth'
 import { collection } from 'firebase/firestore'
 
-const projectPath = '/life-recorder/infos/'
+const projectPath = '/apps/life-recorder/'
 
 export const useUserStore = defineStore('user', {
   state: () => {
