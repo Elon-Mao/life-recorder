@@ -47,7 +47,7 @@ const actions = computed<VanAction[]>(() => [{
 }, {
   name: 'delete',
   execute: async () => {
-    if (editingLabel.value.recordNum > 0) {
+    if (editingLabel.value.recordNum! > 0) {
       showNotify('Please delete relevant records first')
       return
     }

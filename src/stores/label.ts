@@ -1,66 +1,44 @@
 import { defineStore } from 'pinia'
-import {
-  doc,
-  query,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  CollectionReference,
-  DocumentData
-} from 'firebase/firestore'
 import customPromise from '@/common/customPromise'
 import { useUserStore } from './user'
+import { elonStore } from './elonStore'
 
 export interface Label {
   id?: string
-  labelName: string
-  recordNum: number
+  labelName?: string
+  recordNum?: number
 }
 
-export const useLabelStore = defineStore('labels', {
+let baseStore
+
+export const useLabelStore = defineStore('labelsExtends', {
   state: () => {
     return {
-      labels: [] as Label[],
-      labelCollection: null as unknown as CollectionReference<DocumentData, DocumentData>
+      labelMap: {} as Record<string, Label>,
+      labels: [] as Label[]
     }
   },
   actions: {
-    init() {
-      onSnapshot(query(useUserStore().getLabelsCollection()), (querySnapshot) => {
-        this.labels = []
-        querySnapshot.forEach((doc) => {
-          this.labels.push({
-            id: doc.id,
-            ...doc.data()
-          } as Label)
-        })
-        this.labels.sort((label0, label1) => label0.recordNum < label1.recordNum ? 1 : -1)
-      })
+    async init() {
+      const useElonStore = elonStore<Label>('labels', useUserStore().getAppCollection(), ['labelName', 'recordNum'])
+      baseStore = useElonStore()
+      await customPromise(baseStore.init())
+      this.labelMap = baseStore.entityMap
+      this.labels = baseStore.entities.sort((l0, l1) => l1.recordNum! - l0.recordNum!)
     },
     async setById(label: Label) {
-      const { id, ...labelData } = label
-      await customPromise(setDoc(doc(useUserStore().getLabelsCollection(), id), labelData))
+      await customPromise(baseStore!.setEntity(label))
     },
     async addEntity(label: Label) {
-      const newDoc = doc(useUserStore().getLabelsCollection())
-      await this.setById({
-        id: newDoc.id,
-        ...label
-      })
-      return newDoc.id
+      await customPromise(baseStore!.addEntity(label))
     },
     async deleteById(id: string) {
-      await customPromise(deleteDoc(doc(useUserStore().getLabelsCollection(), id)))
+      await customPromise(baseStore!.deleteEntity(baseStore!.entityMap[id]))
     },
     async setRecordNum(id: string, addNum: number) {
-      const label = {
-        ...this.labels.find((label) => label.id === id)!
-      }
-      label.recordNum += addNum
+      const label = baseStore!.entityMap[id]
+      label.recordNum! += addNum
       await this.setById(label)
     },
-    async deleteAll() {
-      await Promise.all(this.labels.map((label) => deleteDoc(doc(useUserStore().getLabelsCollection(), label.id))))
-    }
   }
 })

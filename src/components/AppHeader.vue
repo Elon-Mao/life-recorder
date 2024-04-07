@@ -123,7 +123,7 @@ const readLabels = (labelsFile: File, recordsFile: File) => {
       console.log('delete: ', document.id)
       await deleteDoc(doc(userStore.getRecordsCollection(), document.id))
     })
-    await labelStore.deleteAll()
+    // await labelStore.deleteAll()
     const labelsCollection = userStore.getLabelsCollection()
     const csv = event.target!.result as String
     const rows = csv.split('\n')

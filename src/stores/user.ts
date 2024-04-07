@@ -7,6 +7,7 @@ import type { User } from 'firebase/auth'
 import { collection } from 'firebase/firestore'
 
 const projectPath = '/apps/life-recorder/'
+const appName = 'life-recorder'
 
 export const useUserStore = defineStore('user', {
   state: () => {
@@ -39,6 +40,9 @@ export const useUserStore = defineStore('user', {
     },
     getRecordsCollection() {
       return collection(db, `users/${this.user.uid}${projectPath}records`)
+    },
+    getAppCollection() {
+      return collection(db, `users/${this.user.uid}/${appName}`)
     }
   },
 })
