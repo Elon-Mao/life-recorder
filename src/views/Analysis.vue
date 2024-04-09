@@ -366,7 +366,7 @@ const onOptionsChange = () => {
 const loadSingleChart = async () => {
   const labelId = route.query.labelId as string
   labelRecordGroups = await getRecords(labelId)
-  labelName = labelStore.labelMap[labelId].labelName!
+  labelName = labelStore.entityMap[labelId].labelName!
   onOptionsChange()
 }
 

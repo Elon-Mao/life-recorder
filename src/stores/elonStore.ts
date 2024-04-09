@@ -1,5 +1,4 @@
-import { ref, Ref } from 'vue'
-import { defineStore } from 'pinia'
+import { reactive, computed } from 'vue'
 import {
   collection,
   doc,
@@ -14,6 +13,7 @@ import {
 import type {
   CollectionReference,
   DocumentData,
+  DocumentReference,
   FieldValue,
 } from 'firebase/firestore'
 
@@ -21,16 +21,21 @@ export interface BaseEntity {
   id?: string
 }
 
-export const elonStore = <Entity extends BaseEntity>(
+const uninitializedError = 'Store is uninitialized'
+
+export const useElonStore = <Entity extends BaseEntity>(
   storeId: string,
-  collectionReference: CollectionReference,
   briefKeys: (keyof Entity)[],
   detailKeys: (keyof Entity)[] = [],
 ) => {
-  const briefDocument = doc(collectionReference, storeId)
-  const detailCollection = collection(collectionReference, storeId, 'details')
+  let briefDocument: DocumentReference | undefined
+  let detailCollection: CollectionReference | undefined
+  const entityMap = reactive<Record<string, Entity>>({})
 
   const getDetailDoc = (id: string) => {
+    if (!detailCollection) {
+      throw new Error(uninitializedError)
+    }
     return doc(detailCollection, id)
   }
 
@@ -77,118 +82,164 @@ export const elonStore = <Entity extends BaseEntity>(
     await Promise.all(entities.map(callbackfn))
   }
 
-  return defineStore(storeId, {
-    state: () => {
-      return {
-        entityMap: {} as Record<string, Entity>,
-        entities: ref<Entity[]>([]) as Ref<Entity[]>
+  const init = async (collectionReference: CollectionReference) => {
+    briefDocument = doc(collectionReference, storeId)
+    detailCollection = collection(collectionReference, storeId, 'details')
+    const documentSnapshot = await getDoc(briefDocument)
+    Object.keys(entityMap).forEach(id => {
+      delete entityMap[id]
+    })
+    if (documentSnapshot.exists()) {
+      const documentDataMap = documentSnapshot.data()
+      for (const [id, documentData] of Object.entries(documentDataMap)) {
+        entityMap[id] = {
+          id
+        } as Entity
+        dataToBrief(documentData, entityMap[id])
       }
-    },
-    actions: {
-      async init() {
-        const documentSnapshot = await getDoc(briefDocument)
-        if (documentSnapshot.exists()) {
-          const documentDataMap = documentSnapshot.data()
-          for (const [id, documentData] of Object.entries(documentDataMap)) {
-            this.entityMap[id] = {
-              id
-            } as Entity
-            dataToBrief(documentData, this.entityMap[id])
-          }
-        } else {
-          await setDoc(briefDocument, {})
-          this.entityMap = {}
-        }
-        this.createArrayFromMap()
-      },
-      createArrayFromMap() {
-        this.entities = []
-        for (const id in this.entityMap) {
-          this.entities.push(this.entityMap[id])
-        }
-        return this.entities.sort((e0, e1) => e0.id!.localeCompare(e1.id!))
-      },
-      async addEntity(entity: Entity) {
-        await this.addEntities([entity])
-      },
-      async addEntities(entities: Entity[]) {
-        await this._addDetails(entities)
-        await this.setBriefs(entities)
-        this.createArrayFromMap()
-      },
-      async setDetail(entity: Entity) {
-        if (!entity.id) {
-          return
-        }
-        await setDoc(getDetailDoc(entity.id), entityToDetail(entity))
-      },
-      async setDetails(entities: Entity[]) {
-        await batchAction(entities, (entity) => this.setDetail(entity))
-      },
-      async setBrief(entity: Entity) {
-        await this.setBriefs([entity])
-      },
-      async setBriefs(
-        entities: Entity[],
-        fieldGetter: (entity: Entity) => FieldValue = (entity) => entityToBrief(entity) as unknown as FieldValue
-      ) {
-        const updatedData: Record<string, FieldValue> = {}
-        for (const entity of entities) {
-          if (entity.id) {
-            updatedData[entity.id] = fieldGetter(entity)
-          }
-        }
-        await updateDoc(briefDocument, updatedData)
-      },
-      async setEntity(entity: Entity) {
-        await this.setEntities([entity])
-      },
-      async setEntities(entities: Entity[]) {
-        await Promise.all([
-          this.setDetails(entities),
-          this.setBriefs(entities)
-        ])
-      },
-      async getDetail(entity: Entity) {
-        if (!entity.id) {
-          return
-        }
-        const documentSnapshot = await getDoc(getDetailDoc(entity.id))
-        if (documentSnapshot.exists()) {
-          dataToDetail(documentSnapshot.data(), entity)
-        }
-      },
-      async getDetails(entities: Entity[]) {
-        await batchAction(entities, (entity) => this.getDetail(entity))
-      },
-      async deleteEntity(entity: Entity) {
-        await this.deleteEntities([entity])
-      },
-      async deleteEntities(entities: Entity[]) {
-        await Promise.all([
-          this._deleteDetails(entities),
-          this.setBriefs(entities, () => deleteField())
-        ])
-        this.createArrayFromMap()
-      },
-      async _addDetail(entity: Entity) {
-        const documentReference = await addDoc(detailCollection, entityToDetail(entity))
-        entity.id = documentReference.id
-        this.entityMap[entity.id] = entity
-      },
-      async _addDetails(entities: Entity[]) {
-        await batchAction(entities, (entity) => this._addDetail(entity))
-      },
-      async _deleteDetail(entity: Entity) {
-        if (!entity.id) {
-          return
-        }
-        await deleteDoc(getDetailDoc(entity.id))
-        delete this.entityMap[entity.id]
-      },
-      async _deleteDetails(entities: Entity[]) {
-        await batchAction(entities, (entity) => this._deleteDetail(entity))
+    } else {
+      await setDoc(briefDocument, {})
+    }
+  }
+
+  const addEntity = async (entity: Entity) => {
+    await addEntities([entity])
+  }
+
+  const addEntities = async (entities: Entity[]) => {
+    await _addDetails(entities)
+    await setBriefs(entities)
+  }
+
+  const setDetail = async (entity: Entity) => {
+    if (!entity.id) {
+      return
+    }
+    await setDoc(getDetailDoc(entity.id), entityToDetail(entity))
+  }
+
+  const setDetails = async (entities: Entity[]) => {
+    await batchAction(entities, (entity) => setDetail(entity))
+  }
+
+  const setBrief = async (entity: Entity) => {
+    await setBriefs([entity])
+  }
+
+  const setBriefs = async (
+    entities: Entity[],
+    fieldGetter: (entity: Entity) => FieldValue = (entity) => entityToBrief(entity) as unknown as FieldValue
+  ) => {
+    if (!briefDocument) {
+      throw new Error(uninitializedError)
+    }
+    const updatedData: Record<string, FieldValue> = {}
+    for (const entity of entities) {
+      if (entity.id) {
+        updatedData[entity.id] = fieldGetter(entity)
       }
     }
+    await updateDoc(briefDocument, updatedData)
+  }
+
+  const setEntity = async (entity: Entity) => {
+    await setEntities([entity])
+  }
+
+  const setEntities = async (entities: Entity[]) => {
+    await Promise.all([
+      setDetails(entities),
+      setBriefs(entities)
+    ])
+  }
+
+  const getDetail = async (entity: Entity) => {
+    if (!entity.id) {
+      return
+    }
+    const documentSnapshot = await getDoc(getDetailDoc(entity.id))
+    if (documentSnapshot.exists()) {
+      dataToDetail(documentSnapshot.data(), entity)
+    }
+  }
+
+  const getDetails = async (entities: Entity[]) => {
+    await batchAction(entities, (entity) => getDetail(entity))
+  }
+
+  const deleteEntity = async (entity: Entity) => {
+    await deleteEntities([entity])
+  }
+
+  const deleteEntities = async (entities: Entity[]) => {
+    await Promise.all([
+      _deleteDetails(entities),
+      setBriefs(entities, () => deleteField())
+    ])
+  }
+
+  const _addDetail = async (entity: Entity) => {
+    if (!detailCollection) {
+      throw new Error(uninitializedError)
+    }
+    const documentReference = await addDoc(detailCollection, entityToDetail(entity))
+    entity.id = documentReference.id
+    entityMap[entity.id] = entity
+  }
+
+  const _addDetails = async (entities: Entity[]) => {
+    await batchAction(entities, (entity) => _addDetail(entity))
+  }
+
+  const _deleteDetail = async (entity: Entity) => {
+    if (!entity.id) {
+      return
+    }
+    await deleteDoc(getDetailDoc(entity.id))
+    delete entityMap[entity.id]
+  }
+
+  const _deleteDetails = async (entities: Entity[]) => {
+    await batchAction(entities, (entity) => _deleteDetail(entity))
+  }
+
+  const entities = computed(() => {
+    const entities = []
+    for (const id in entityMap) {
+      entities.push(entityMap[id])
+    }
+    return entities.sort((e0, e1) => e0.id!.localeCompare(e1.id!))
   })
+
+  return {
+    entityMap,
+    briefDocument,
+    detailCollection,
+    getDetailDoc,
+    entityToData,
+    entityToBrief,
+    entityToDetail,
+    dataToEntity,
+    dataToBrief,
+    dataToDetail,
+    batchAction,
+    init,
+    addEntity,
+    addEntities,
+    setDetail,
+    setDetails,
+    setBrief,
+    setBriefs,
+    setEntity,
+    setEntities,
+    getDetail,
+    getDetails,
+    deleteEntity,
+    deleteEntities,
+    _addDetail,
+    _addDetails,
+    _deleteDetail,
+    _deleteDetails,
+    entities,
+  }
 }

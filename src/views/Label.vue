@@ -13,6 +13,7 @@ import {
 } from 'vant'
 import { Label, useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
+import customPromise from '@/common/customPromise'
 
 const router = useRouter()
 const labelStore = useLabelStore()
@@ -54,7 +55,7 @@ const actions = computed<VanAction[]>(() => [{
     await showConfirmDialog({
       message: 'Data will not be able to recover'
     })
-    await labelStore.deleteById(editingLabel.value.id!)
+    await customPromise(labelStore.deleteLabel(editingLabel.value.id!))
     showAction.value = false
   },
   color: '#ee0a24',
@@ -82,11 +83,7 @@ const beforeClose = async (action: string) => {
 
   try {
     await labelForm.value.validate()
-    if (editingLabel.value.id) {
-      await labelStore.setById(editingLabel.value)
-    } else {
-      await labelStore.addEntity(editingLabel.value)
-    }
+    await customPromise(labelStore.setLabel(editingLabel.value))
     return true
   } catch {
     return false

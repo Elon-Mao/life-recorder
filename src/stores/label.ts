@@ -1,7 +1,6 @@
+import { computed } from 'vue'
 import { defineStore } from 'pinia'
-import customPromise from '@/common/customPromise'
-import { useUserStore } from './user'
-import { elonStore } from './elonStore'
+import { useElonStore } from './elonStore'
 
 export interface Label {
   id?: string
@@ -9,36 +8,39 @@ export interface Label {
   recordNum?: number
 }
 
-let baseStore
+const storeId = 'labels'
+export const useLabelStore = defineStore(storeId, () => {
+  const elonStore = useElonStore<Label>(storeId, ['labelName', 'recordNum'])
 
-export const useLabelStore = defineStore('labelsExtends', {
-  state: () => {
-    return {
-      labelMap: {} as Record<string, Label>,
-      labels: [] as Label[]
+  const setLabel = async (label: Label) => {
+    if (label.id) {
+      const storeLabel = elonStore.entityMap[label.id]
+      storeLabel.labelName = label.labelName
+      await elonStore.setBrief(storeLabel)
+    } else {
+      await elonStore.addEntity(label)
     }
-  },
-  actions: {
-    async init() {
-      const useElonStore = elonStore<Label>('labels', useUserStore().getAppCollection(), ['labelName', 'recordNum'])
-      baseStore = useElonStore()
-      await customPromise(baseStore.init())
-      this.labelMap = baseStore.entityMap
-      this.labels = baseStore.entities.sort((l0, l1) => l1.recordNum! - l0.recordNum!)
-    },
-    async setById(label: Label) {
-      await customPromise(baseStore!.setEntity(label))
-    },
-    async addEntity(label: Label) {
-      await customPromise(baseStore!.addEntity(label))
-    },
-    async deleteById(id: string) {
-      await customPromise(baseStore!.deleteEntity(baseStore!.entityMap[id]))
-    },
-    async setRecordNum(id: string, addNum: number) {
-      const label = baseStore!.entityMap[id]
-      label.recordNum! += addNum
-      await this.setById(label)
-    },
+  }
+
+  const deleteLabel = async(id: string) => {
+    await elonStore.deleteEntity(elonStore.entityMap[id])
+  }
+
+  const setRecordNum = async (id: string, addNum: number) => {
+    const label = elonStore.entityMap[id]
+    label.recordNum! += addNum
+    await elonStore.setBrief(label)
+  }
+
+  const labels = computed(() => {
+    return elonStore.entities.value.sort((l0, l1) => l1.recordNum! - l0.recordNum!)
+  })
+
+  return {
+    ...elonStore,
+    setLabel,
+    deleteLabel,
+    setRecordNum,
+    labels,
   }
 })
