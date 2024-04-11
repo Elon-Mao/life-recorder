@@ -83,6 +83,7 @@ const actions: VanAction[] = [{
       recordStore.deleteRecord(editingRecord.value.id!),
       labelStore.setRecordNum(editingRecord.value.labelId!, -1)
     ]))
+    await getRecordsByDate()
     showAction.value = false
   },
   color: '#ee0a24'
@@ -220,13 +221,13 @@ const onDateChange = async () => {
   await getRecordsByDate()
 }
 
-if (labelStore.labels.length) {
+if (recordStore.entities.length) {
   onDateChange()
 } else {
-  const labelsWatch = watch(() => labelStore.labels, () => {
-    if (labelStore.labels.length) {
+  const recordsWatch = watch(() => recordStore.entities, () => {
+    if (recordStore.entities.length) {
       onDateChange()
-      labelsWatch()
+      recordsWatch()
     }
   })
 }

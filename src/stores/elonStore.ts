@@ -122,6 +122,26 @@ export const useElonStore = <Entity extends BaseEntity>(
     await setBriefs(entities)
   }
 
+  const setBrief = async (entity: Entity) => {
+    await setBriefs([entity])
+  }
+
+  const setBriefs = async (entities: Entity[]) => {
+    if (!briefDocument) {
+      throw new Error(uninitializedError)
+    }
+    const updatedData: Record<string, Entity> = {}
+    for (const entity of entities) {
+      if (entity.id) {
+        updatedData[entity.id] = entityToBrief(entity)
+      }
+    }
+    await updateDoc(briefDocument, updatedData)
+    for (const entity of entities) {
+      updateEntityMap(entity, briefKeys)
+    }
+  }
+
   const setDetail = async (entity: Entity) => {
     if (!entity.id) {
       return
@@ -132,29 +152,6 @@ export const useElonStore = <Entity extends BaseEntity>(
 
   const setDetails = async (entities: Entity[]) => {
     await batchAction(entities, setDetail)
-  }
-
-  const setBrief = async (entity: Entity) => {
-    await setBriefs([entity])
-  }
-
-  const setBriefs = async (
-    entities: Entity[],
-    fieldGetter: (entity: Entity) => FieldValue = (entity) => entityToBrief(entity) as unknown as FieldValue
-  ) => {
-    if (!briefDocument) {
-      throw new Error(uninitializedError)
-    }
-    const updatedData: Record<string, FieldValue> = {}
-    for (const entity of entities) {
-      if (entity.id) {
-        updatedData[entity.id] = fieldGetter(entity)
-      }
-    }
-    await updateDoc(briefDocument, updatedData)
-    for (const entity of entities) {
-      updateEntityMap(entity, briefKeys)
-    }
   }
 
   const setEntity = async (entity: Entity) => {
@@ -189,7 +186,7 @@ export const useElonStore = <Entity extends BaseEntity>(
   const deleteEntities = async (entities: Entity[]) => {
     await Promise.all([
       _deleteDetails(entities),
-      setBriefs(entities, () => deleteField())
+      _deleteBriefs(entities),
     ])
   }
 
@@ -206,12 +203,25 @@ export const useElonStore = <Entity extends BaseEntity>(
     await batchAction(entities, _addDetail)
   }
 
+  const _deleteBriefs = async (entities: Entity[]) => {
+    if (!briefDocument) {
+      throw new Error(uninitializedError)
+    }
+    const updatedData: Record<string, FieldValue> = {}
+    for (const entity of entities) {
+      if (entity.id) {
+        updatedData[entity.id] = deleteField()
+        delete entityMap[entity.id]
+      }
+    }
+    await updateDoc(briefDocument, updatedData)
+  }
+
   const _deleteDetail = async (entity: Entity) => {
     if (!entity.id) {
       return
     }
     await deleteDoc(getDetailDoc(entity.id))
-    delete entityMap[entity.id]
   }
 
   const _deleteDetails = async (entities: Entity[]) => {
@@ -231,6 +241,7 @@ export const useElonStore = <Entity extends BaseEntity>(
     briefDocument,
     detailCollection,
     getDetailDoc,
+    updateEntityMap,
     entityToData,
     entityToBrief,
     entityToDetail,
@@ -241,10 +252,10 @@ export const useElonStore = <Entity extends BaseEntity>(
     init,
     addEntity,
     addEntities,
-    setDetail,
-    setDetails,
     setBrief,
     setBriefs,
+    setDetail,
+    setDetails,
     setEntity,
     setEntities,
     getDetail,
@@ -253,6 +264,7 @@ export const useElonStore = <Entity extends BaseEntity>(
     deleteEntities,
     _addDetail,
     _addDetails,
+    _deleteBriefs,
     _deleteDetail,
     _deleteDetails,
     entities,
