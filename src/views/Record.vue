@@ -17,27 +17,17 @@ import {
   showConfirmDialog,
   Icon as vanIcon,
 } from 'vant'
-import {
-  doc,
-  query,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  where,
-  Unsubscribe
-} from 'firebase/firestore'
 import customPromise from '@/common/customPromise'
 import convertToRecord from '@/common/convertToRecord'
-import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
+import { useRecordStore } from '@/stores/recordData'
 import VanAction from '@/types/VanAction'
-import RecordData from '@/types/RecordData'
 import RecordForm from '@/types/RecordForm'
 import { getFormatDate } from '@/common/dateTools'
+import type { RecordData } from '@/stores/recordData'
 
-const userStore = useUserStore()
 const labelStore = useLabelStore()
-const recordCollection = userStore.getRecordsCollection()
+const recordStore = useRecordStore()
 
 const getCurrentTimeParts = () => {
   const currentDate = new Date()
@@ -90,7 +80,7 @@ const actions: VanAction[] = [{
       message: 'Data will not be recovered'
     })
     await customPromise(Promise.all([
-      deleteDoc(doc(recordCollection, editingRecord.value.id)),
+      recordStore.deleteRecord(editingRecord.value.id!),
       labelStore.setRecordNum(editingRecord.value.labelId!, -1)
     ]))
     showAction.value = false
@@ -164,28 +154,29 @@ const onRecordConfirm = async () => {
     return
   }
   const data = {
+    id: newRecord.id,
     labelId: newRecord.labelPicker[0],
     date: recordsDateStr.value,
     startTime: newRecord.startTime,
     endTime: newRecord.endTime,
     remark: newRecord.remark
   }
-  if (newRecord.id) {
-    const promiseAll = [setDoc(doc(recordCollection, newRecord.id), data)]
-    const oldLabelId = records.value.find((record) => record.id === newRecord.id)!.labelId!
+  if (data.id) {
+    const promiseAll = [recordStore.setEntity(data)]
+    const oldLabelId = records.value.find((record) => record.id === data.id)!.labelId!
     if (oldLabelId !== data.labelId) {
       promiseAll.push(labelStore.setRecordNum(oldLabelId, -1))
       promiseAll.push(labelStore.setRecordNum(data.labelId, 1))
     }
     await customPromise(Promise.all(promiseAll))
   } else {
-    const newDoc = doc(recordCollection)
     await customPromise(Promise.all([
-      setDoc(doc(recordCollection, newDoc.id), data),
+      recordStore.addEntity(data),
       labelStore.setRecordNum(data.labelId, 1)
     ]))
   }
 
+  await getRecordsByDate()
   showPickerGroup.value = false
   showNotify({ type: 'success', message: 'Add Success' })
 }
@@ -202,36 +193,31 @@ const lastDay = () => {
 const nextDay = () => {
   addRecordDate(1)
 }
-const onDateConfirm = (value: Date) => {
+const onDateConfirm = async (value: Date) => {
   recordsDate.value = value
-  onDateChange()
+  await onDateChange()
   showCalendar.value = false
 }
 
 let recordsDate = ref(new Date())
 const recordsDateStr = ref('')
 const records = ref<RecordForm[]>([])
-let unsubscribe: Unsubscribe
-const onDateChange = () => {
+
+const getRecordsByDate = async () => {
+  records.value = []
+  const recordDatas = await customPromise<RecordData[]>(recordStore.listByDate(recordsDateStr.value))
+  records.value = recordDatas
+    .map(convertToRecord)
+    .sort((record0, record1) => record0.startTime! > record1.startTime! ? -1 : 1)
+}
+
+const onDateChange = async () => {
   const newDateStr = getFormatDate(recordsDate.value)
   if (newDateStr === recordsDateStr.value) {
     return
   }
   recordsDateStr.value = newDateStr
-  if (unsubscribe) {
-    unsubscribe()
-  }
-  records.value = []
-  unsubscribe = onSnapshot(query(recordCollection, where('date', '==', recordsDateStr.value)), (querySnapshot) => {
-    records.value = []
-    querySnapshot.forEach((doc) => {
-      records.value.push(convertToRecord({
-        id: doc.id,
-        ...doc.data()
-      } as RecordData))
-    })
-    records.value.sort((record0, record1) => record0.startTime! > record1.startTime! ? -1 : 1)
-  })
+  await getRecordsByDate()
 }
 
 if (labelStore.labels.length) {
@@ -299,8 +285,8 @@ if (labelStore.labels.length) {
       <van-time-picker v-model="editingRecord.startTimeParts" :visible-option-num="3" />
       <van-time-picker v-model="editingRecord.endTimeParts" :visible-option-num="3" />
     </van-picker-group>
-    <van-field v-model="editingRecord.remark" label-align="top" label="Remark:" placeholder="input remark" maxlength="50"
-      type="textarea" show-word-limit />
+    <van-field v-model="editingRecord.remark" label-align="top" label="Remark:" placeholder="input remark"
+      maxlength="50" type="textarea" show-word-limit />
   </van-popup>
 </template>
 

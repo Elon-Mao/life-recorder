@@ -14,9 +14,7 @@ export const useLabelStore = defineStore(storeId, () => {
 
   const setLabel = async (label: Label) => {
     if (label.id) {
-      const storeLabel = elonStore.entityMap[label.id]
-      storeLabel.labelName = label.labelName
-      await elonStore.setBrief(storeLabel)
+      await elonStore.setBrief(label)
     } else {
       await elonStore.addEntity(label)
     }

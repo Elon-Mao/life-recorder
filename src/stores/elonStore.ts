@@ -39,6 +39,17 @@ export const useElonStore = <Entity extends BaseEntity>(
     return doc(detailCollection, id)
   }
 
+  const updateEntityMap = (entity: Entity, keys: (keyof Entity)[]) => {
+    if (!entity.id) {
+      return
+    }
+    const entityInMap = entityMap[entity.id] || {}
+    for (const key of keys) {
+      entityInMap[key] = entity[key]
+    }
+    entityMap[entity.id] = entityInMap
+  }
+
   const entityToData = (entity: Entity, keys: (keyof Entity)[]) => {
     const data = {} as Entity
     for (const key of keys) {
@@ -116,10 +127,11 @@ export const useElonStore = <Entity extends BaseEntity>(
       return
     }
     await setDoc(getDetailDoc(entity.id), entityToDetail(entity))
+    updateEntityMap(entity, detailKeys)
   }
 
   const setDetails = async (entities: Entity[]) => {
-    await batchAction(entities, (entity) => setDetail(entity))
+    await batchAction(entities, setDetail)
   }
 
   const setBrief = async (entity: Entity) => {
@@ -140,6 +152,9 @@ export const useElonStore = <Entity extends BaseEntity>(
       }
     }
     await updateDoc(briefDocument, updatedData)
+    for (const entity of entities) {
+      updateEntityMap(entity, briefKeys)
+    }
   }
 
   const setEntity = async (entity: Entity) => {
@@ -164,7 +179,7 @@ export const useElonStore = <Entity extends BaseEntity>(
   }
 
   const getDetails = async (entities: Entity[]) => {
-    await batchAction(entities, (entity) => getDetail(entity))
+    await batchAction(entities, getDetail)
   }
 
   const deleteEntity = async (entity: Entity) => {
@@ -188,7 +203,7 @@ export const useElonStore = <Entity extends BaseEntity>(
   }
 
   const _addDetails = async (entities: Entity[]) => {
-    await batchAction(entities, (entity) => _addDetail(entity))
+    await batchAction(entities, _addDetail)
   }
 
   const _deleteDetail = async (entity: Entity) => {
@@ -200,7 +215,7 @@ export const useElonStore = <Entity extends BaseEntity>(
   }
 
   const _deleteDetails = async (entities: Entity[]) => {
-    await batchAction(entities, (entity) => _deleteDetail(entity))
+    await batchAction(entities, _deleteDetail)
   }
 
   const entities = computed(() => {

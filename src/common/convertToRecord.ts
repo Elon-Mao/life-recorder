@@ -1,5 +1,5 @@
 import { useLabelStore } from '@/stores/label'
-import RecordData from '@/types/RecordData'
+import type { RecordData } from '@/stores/recordData'
 import RecordForm from '@/types/RecordForm'
 
 const labelStore = useLabelStore()
@@ -18,9 +18,9 @@ export default (recordData: RecordData): RecordForm => {
   const record = {
     ...recordData,
     labelPicker: [recordData.labelId],
-    startTimeParts: recordData.startTime.split(':'),
-    endTimeParts: recordData.endTime.split(':')
-  }
+    startTimeParts: recordData.startTime!.split(':'),
+    endTimeParts: recordData.endTime!.split(':')
+  } as RecordForm
   calculateLabelName(record)
   calculateSpan(record)
   return record

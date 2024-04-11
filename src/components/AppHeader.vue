@@ -15,18 +15,13 @@ import {
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
+import { useRecordStore } from '@/stores/recordData'
 import { useSystemStore } from '@/stores/system'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { auth, provider } from '@/config/firebase'
-import {
-  query,
-  getDocs,
-  deleteDoc,
-  doc,
-  setDoc,
-} from 'firebase/firestore'
 import downloadText from '@/common/downloadText'
-import RecordData from '@/types/RecordData'
+import type { Label } from '@/stores/label'
+import type { RecordData } from '@/stores/recordData'
 
 const userPopShow = ref(false)
 const importPopShow = ref(false)
@@ -34,6 +29,7 @@ const fileList = ref<UploaderFileListItem []>([])
 const route = useRoute()
 const userStore = useUserStore()
 const labelStore = useLabelStore()
+const recordStore = useRecordStore()
 const systemStore = useSystemStore()
 onAuthStateChanged(auth, (user) => {
   userPopShow.value = false
@@ -41,26 +37,19 @@ onAuthStateChanged(auth, (user) => {
 })
 
 const exportUserData = async () => {
-  const querySnapshot = await getDocs(query(userStore.getRecordsCollection()))
-  const records: RecordData[] = []
-  querySnapshot.forEach((doc) => {
-    records.push({
-      id: doc.id,
-      ...doc.data()
-    } as RecordData)
-  })
+  const records = [...recordStore.entities]
   records.sort((record0, record1) => {
-    if (record0.date > record1.date) {
+    if (record0.date! > record1.date!) {
       return -1
     }
-    if (record0.date < record1.date) {
+    if (record0.date! < record1.date!) {
       return 1
     }
     return record0.startTime! > record1.startTime! ? -1 : 1
   })
 
-  downloadText('Record Id,Label Id,Date,Start Time,End Time,Remark,\n' + records.map((record) =>
-    `${record.id},${record.labelId},${record.date},${record.startTime},${record.endTime},${record.remark}`)
+  downloadText('Record Id,Label Id,Date,Start Time,End Time,\n' + records.map((record) =>
+    `${record.id},${record.labelId},${record.date},${record.startTime},${record.endTime}`)
     .join(',\n'), 'records.csv')
   downloadText('Label Id,Name,Record Number,\n' + labelStore.labels.map((label) =>
     `${label.id},${label.labelName},${records.reduce((recordNum, record) => record.labelId === label.id ? recordNum + 1 : recordNum
@@ -92,21 +81,21 @@ const importDisabled = computed(() => {
 const readRecords = (recordsFile: File) => {
   const recordsReader = new FileReader()
   recordsReader.onload = async (event: ProgressEvent<FileReader>) => {
-    const recordCollection = userStore.getRecordsCollection()
     const csv = event.target!.result as String
     const rows = csv.split('\n')
+    const records: RecordData[] = []
     rows.shift()
     rows.forEach(async row => {
       const columns = row.split(',')
-      console.log('add record: ', columns[0])
-      await setDoc(doc(recordCollection, columns[0]), {
+      records.push({
+        id: columns[0],
         labelId: columns[1],
         date: columns[2],
         startTime: columns[3],
         endTime: columns[4],
-        remark: columns[5],
       })
     })
+    await recordStore.setEntities(records)
     systemStore.setLoading(false)
     showNotify({ type: 'success', message: 'Import Success' })
     importPopShow.value = false
@@ -118,24 +107,19 @@ const readLabels = (labelsFile: File, recordsFile: File) => {
   systemStore.setLoading(true)
   const labelsReader = new FileReader()
   labelsReader.onload = async (event: ProgressEvent<FileReader>) => {
-    const querySnapshot = await getDocs(query(userStore.getRecordsCollection()))
-    querySnapshot.forEach(async (document) => {
-      console.log('delete: ', document.id)
-      await deleteDoc(doc(userStore.getRecordsCollection(), document.id))
-    })
-    // await labelStore.deleteAll()
-    const labelsCollection = userStore.getLabelsCollection()
     const csv = event.target!.result as String
     const rows = csv.split('\n')
+    const labels: Label[] = []
     rows.shift()
     rows.forEach(async row => {
       const columns = row.split(',')
-      console.log('add label: ', columns[0])
-      await setDoc(doc(labelsCollection, columns[0]), {
+      labels.push({
+        id: columns[0],
         labelName: columns[1],
         recordNum: Number(columns[2])
       })
     })
+    await labelStore.setEntities(labels)
     readRecords(recordsFile)
   }
   labelsReader.readAsText(labelsFile)

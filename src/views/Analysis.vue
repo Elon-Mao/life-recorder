@@ -6,22 +6,16 @@ import {
   Radio as VanRadio
 } from 'vant'
 import * as echarts from 'echarts'
-import {
-  query,
-  where,
-  getDocs
-} from 'firebase/firestore'
-import { useUserStore } from '@/stores/user'
 import { useLabelStore } from '@/stores/label'
+import { useRecordStore } from '@/stores/recordData'
 import { calculateSpan } from '@/common/convertToRecord'
 import RecordForm from '@/types/RecordForm'
 import { dayMills, getFormatDate } from '@/common/dateTools'
 import { CallbackDataParams } from 'echarts/types/dist/shared.js'
 
 const route = useRoute()
-const userStore = useUserStore()
 const labelStore = useLabelStore()
-const recordCollection = userStore.getRecordsCollection()
+const recordStore = useRecordStore()
 
 const gridDom = ref(null)
 let chartGrid: echarts.EChartsType
@@ -56,7 +50,7 @@ interface DateRecordGroup {
   records: RecordForm[]
 }
 
-const loadMultiChart = async () => {
+const loadMultiChart = () => {
   const labelSets: LabelSet[] = [{
     name: 'Studying English',
     labels: ['AS44HIQqRwzV6kCej2rE', 'vI2mPDqbYFafcq58DqVB'],
@@ -72,9 +66,9 @@ const loadMultiChart = async () => {
   let minDateStr = getFormatDate(new Date())
   for (const labelSet of labelSets) {
     for (const labelId of labelSet.labels) {
-      const querySnapshot = await getDocs(query(recordCollection, where('labelId', '==', labelId)))
-      querySnapshot.forEach((document) => {
-        const recordForm = document.data() as RecordForm
+      const records = recordStore.listBylabelId(labelId)
+      for (const record of records) {
+        const recordForm = { ...record } as RecordForm
         recordForm.startTimeParts = recordForm.startTime!.split(':')
         recordForm.endTimeParts = recordForm.endTime!.split(':')
         calculateSpan(recordForm)
@@ -87,7 +81,7 @@ const loadMultiChart = async () => {
           dateSpan = 0
         }
         labelSet.dateSpanMap[date] = dateSpan + recordForm.span!
-      })
+      }
     }
   }
   const maxDate = new Date()
@@ -175,14 +169,12 @@ const loadMultiChart = async () => {
   })
 }
 
-const getRecords = async (labelId: string) => {
-  const querySnapshot = await getDocs(query(recordCollection, where('labelId', '==', labelId)))
-  const records: RecordForm[] = []
+const getRecords = (labelId: string) => {
   const minDate = new Date()
   minDate.setDate(minDate.getDate() - 7)
   let minDateStr = getFormatDate(minDate)
-  querySnapshot.forEach((document) => {
-    const recordForm = document.data() as RecordForm
+  const records = recordStore.listBylabelId(labelId).map((record) => {
+    const recordForm = { ...record } as RecordForm
     recordForm.startTimeParts = recordForm.startTime!.split(':')
     recordForm.endTimeParts = recordForm.endTime!.split(':')
     calculateSpan(recordForm)
@@ -190,7 +182,7 @@ const getRecords = async (labelId: string) => {
     if (date < minDateStr) {
       minDateStr = date
     }
-    records.push(recordForm)
+    return recordForm
   })
   const maxDate = new Date()
   const dateRecordGroups = []

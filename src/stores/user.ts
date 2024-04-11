@@ -5,8 +5,8 @@ import { useSystemStore } from '@/stores/system'
 import { useLabelStore } from '@/stores/label'
 import type { User } from 'firebase/auth'
 import { collection } from 'firebase/firestore'
+import { useRecordStore } from './recordData'
 
-const projectPath = '/apps/life-recorder/'
 const appName = 'life-recorder'
 
 export const useUserStore = defineStore('user', {
@@ -33,13 +33,8 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('user', JSON.stringify(user))
       router.push({ name: 'Home'})
       await useLabelStore().init(this.getAppCollection())
+      await useRecordStore().init(this.getAppCollection())
       success()
-    },
-    getLabelsCollection() {
-      return collection(db, `users/${this.user.uid}${projectPath}labels`)
-    },
-    getRecordsCollection() {
-      return collection(db, `users/${this.user.uid}${projectPath}records`)
     },
     getAppCollection() {
       return collection(db, `users/${this.user.uid}/${appName}`)

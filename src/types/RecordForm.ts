@@ -1,6 +1,6 @@
-import RecordData from './RecordData'
+import type { RecordData } from '@/stores/recordData'
 
-export default interface RecordForm extends Partial<RecordData> {
+export default interface RecordForm extends RecordData {
   labelName?: string
   labelPicker: string[]
   startTimeParts: string[]

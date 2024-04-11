@@ -11,9 +11,10 @@ import {
   showConfirmDialog,
   showNotify,
 } from 'vant'
-import { Label, useLabelStore } from '@/stores/label'
+import { useLabelStore } from '@/stores/label'
 import VanAction from '@/types/VanAction'
 import customPromise from '@/common/customPromise'
+import type { Label } from '@/stores/label'
 
 const router = useRouter()
 const labelStore = useLabelStore()

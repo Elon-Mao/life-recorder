@@ -3,35 +3,28 @@ import {
 } from 'vant'
 import { useSystemStore } from '@/stores/system'
 
-export default (promise: Promise<any>) => {
+function timeoutPromise(ms: number) {
+  return new Promise((_resolve, reject) => {
+    setTimeout(() => {
+      reject(new Error('Timeout'));
+    }, ms);
+  });
+}
+
+export default async <T>(promise: Promise<T>) => {
   const systemStore = useSystemStore()
-  let isFinished = false
-  const onFinal = (func: Function) => {
-    if (isFinished) {
-      return
+  systemStore.setLoading(true)
+  try {
+    return await Promise.race<T>([
+      promise,
+      timeoutPromise(8000) as Promise<T>
+    ])
+  } catch (error) {
+    if (error instanceof Error) {
+      showNotify(error.message)
     }
-    isFinished = true
-    func()
+    throw error
+  } finally {
     systemStore.setLoading(false)
   }
-  systemStore.setLoading(true)
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      onFinal(() => {
-        showNotify('Network Error')
-        reject(new Error('Timed out.'))
-      })
-    }, 8000)
-    promise.then((result) => {
-      onFinal(() => {
-        clearTimeout(timeoutId)
-        resolve(result)
-      })
-    }).catch((error) => {
-      onFinal(() => {
-        showNotify('Network Error.')
-        reject(error)
-      })
-    })
-  })
 }
