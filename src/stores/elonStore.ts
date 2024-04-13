@@ -43,7 +43,9 @@ export const useElonStore = <Entity extends BaseEntity>(
     if (!entity.id) {
       return
     }
-    const entityInMap = entityMap[entity.id] || {}
+    const entityInMap = entityMap[entity.id] || {
+      id: entity.id
+    }
     for (const key of keys) {
       entityInMap[key] = entity[key]
     }
