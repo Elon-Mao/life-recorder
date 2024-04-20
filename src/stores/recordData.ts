@@ -15,7 +15,8 @@ export const useRecordStore = defineStore(storeId, () => {
   const elonStore = useElonStore<RecordData>(storeId, ['labelId', 'date', 'startTime', 'endTime'], ['remark'])
 
   const deleteRecord = async (id: string) => {
-    await elonStore.deleteEntity(elonStore.entityMap[id])
+    elonStore.deleteEntity(elonStore.entityMap[id])
+    await elonStore.commit()
   }
 
   const listBylabelId = (labelId: string) => elonStore.entities.value.filter((record) => record.labelId === labelId)

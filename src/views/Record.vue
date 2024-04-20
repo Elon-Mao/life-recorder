@@ -79,9 +79,10 @@ const actions: VanAction[] = [{
     await showConfirmDialog({
       message: 'Data will not be recovered'
     })
+    labelStore.setRecordNum(editingRecord.value.labelId!, -1)
     await customPromise(Promise.all([
       recordStore.deleteRecord(editingRecord.value.id!),
-      labelStore.setRecordNum(editingRecord.value.labelId!, -1)
+      labelStore.commit()
     ]))
     await getRecordsByDate()
     showAction.value = false
@@ -163,17 +164,21 @@ const onRecordConfirm = async () => {
     remark: newRecord.remark
   }
   if (data.id) {
-    const promiseAll = [recordStore.setEntity(data)]
+    recordStore.setEntity(data)
+    const promiseAll = [recordStore.commit()]
     const oldLabelId = records.value.find((record) => record.id === data.id)!.labelId!
     if (oldLabelId !== data.labelId) {
-      promiseAll.push(labelStore.setRecordNum(oldLabelId, -1))
-      promiseAll.push(labelStore.setRecordNum(data.labelId, 1))
+      labelStore.setRecordNum(oldLabelId, -1)
+      labelStore.setRecordNum(data.labelId, 1)
+      promiseAll.push(labelStore.commit())
     }
     await customPromise(Promise.all(promiseAll))
   } else {
+    recordStore.addEntity(data)
+    labelStore.setRecordNum(data.labelId, 1)
     await customPromise(Promise.all([
-      recordStore.addEntity(data),
-      labelStore.setRecordNum(data.labelId, 1)
+      recordStore.commit(),
+      labelStore.commit()
     ]))
   }
 

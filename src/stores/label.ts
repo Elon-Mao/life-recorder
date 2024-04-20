@@ -14,20 +14,22 @@ export const useLabelStore = defineStore(storeId, () => {
 
   const setLabel = async (label: Label) => {
     if (label.id) {
-      await elonStore.setBrief(label)
+      elonStore.setBrief(label)
     } else {
-      await elonStore.addEntity(label)
+      elonStore.addEntity(label)
     }
+    await elonStore.commit()
   }
 
   const deleteLabel = async(id: string) => {
-    await elonStore.deleteEntity(elonStore.entityMap[id])
+    elonStore.deleteEntity(elonStore.entityMap[id])
+    await elonStore.commit()
   }
 
-  const setRecordNum = async (id: string, addNum: number) => {
+  const setRecordNum = (id: string, addNum: number) => {
     const label = elonStore.entityMap[id]
     label.recordNum! += addNum
-    await elonStore.setBrief(label)
+    elonStore.setBrief(label)
   }
 
   const labels = computed(() => {

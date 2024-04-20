@@ -1,12 +1,10 @@
 import { reactive, computed } from 'vue'
 import {
+  writeBatch,
   collection,
   doc,
   getDoc,
   setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
   deleteField,
   Timestamp,
 } from 'firebase/firestore'
@@ -16,6 +14,7 @@ import type {
   DocumentReference,
   FieldValue,
 } from 'firebase/firestore'
+import { db } from '@/config/firebase'
 
 export interface BaseEntity {
   id?: string
@@ -31,26 +30,8 @@ export const useElonStore = <Entity extends BaseEntity>(
   let briefDocument: DocumentReference | undefined
   let detailCollection: CollectionReference | undefined
   const entityMap = reactive<Record<string, Entity>>({})
-
-  const getDetailDoc = (id: string) => {
-    if (!detailCollection) {
-      throw new Error(uninitializedError)
-    }
-    return doc(detailCollection, id)
-  }
-
-  const updateEntityMap = (entity: Entity, keys: (keyof Entity)[]) => {
-    if (!entity.id) {
-      return
-    }
-    const entityInMap = entityMap[entity.id] || {
-      id: entity.id
-    }
-    for (const key of keys) {
-      entityInMap[key] = entity[key]
-    }
-    entityMap[entity.id] = entityInMap
-  }
+  let batch = writeBatch(db)
+  let updatedData: Record<string, Entity | FieldValue> = {}
 
   const entityToData = (entity: Entity, keys: (keyof Entity)[]) => {
     const data = {} as Entity
@@ -84,15 +65,11 @@ export const useElonStore = <Entity extends BaseEntity>(
   }
 
   const dataToBrief = (documentData: DocumentData, entity: Entity) => {
-    return dataToEntity(documentData, entity, briefKeys)
+    dataToEntity(documentData, entity, briefKeys)
   }
 
   const dataToDetail = (documentData: DocumentData, entity: Entity) => {
-    return dataToEntity(documentData, entity, detailKeys)
-  }
-
-  const batchAction = async (entities: Entity[], callbackfn: (entity: Entity) => Promise<void>) => {
-    await Promise.all(entities.map(callbackfn))
+    dataToEntity(documentData, entity, detailKeys)
   }
 
   const init = async (collectionReference: CollectionReference) => {
@@ -115,119 +92,128 @@ export const useElonStore = <Entity extends BaseEntity>(
     }
   }
 
-  const addEntity = async (entity: Entity) => {
-    await addEntities([entity])
+  const addEntity = (entity: Entity) => {
+    addEntities([entity])
   }
 
-  const addEntities = async (entities: Entity[]) => {
-    await _addDetails(entities)
-    await setBriefs(entities)
+  const addEntities = (entities: Entity[]) => {
+    _addDetails(entities)
+    setBriefs(entities)
   }
 
-  const setBrief = async (entity: Entity) => {
-    await setBriefs([entity])
+  const setBrief = (entity: Entity) => {
+    setBriefs([entity])
   }
 
-  const setBriefs = async (entities: Entity[]) => {
-    if (!briefDocument) {
-      throw new Error(uninitializedError)
-    }
-    const updatedData: Record<string, Entity> = {}
+  const setBriefs = (entities: Entity[]) => {
     for (const entity of entities) {
       if (entity.id) {
         updatedData[entity.id] = entityToBrief(entity)
+        _updateEntityMap(entity.id, entity, briefKeys)
       }
     }
-    await updateDoc(briefDocument, updatedData)
-    for (const entity of entities) {
-      updateEntityMap(entity, briefKeys)
-    }
   }
 
-  const setDetail = async (entity: Entity) => {
-    if (!entity.id) {
-      return
-    }
-    await setDoc(getDetailDoc(entity.id), entityToDetail(entity))
-    updateEntityMap(entity, detailKeys)
+  const setDetail = (entity: Entity) => {
+    setDetails([entity])
   }
 
-  const setDetails = async (entities: Entity[]) => {
-    await batchAction(entities, setDetail)
-  }
-
-  const setEntity = async (entity: Entity) => {
-    await setEntities([entity])
-  }
-
-  const setEntities = async (entities: Entity[]) => {
-    await Promise.all([
-      setDetails(entities),
-      setBriefs(entities)
-    ])
-  }
-
-  const getDetail = async (entity: Entity) => {
-    if (!entity.id) {
-      return
-    }
-    const documentSnapshot = await getDoc(getDetailDoc(entity.id))
-    if (documentSnapshot.exists()) {
-      dataToDetail(documentSnapshot.data(), entity)
-    }
-  }
-
-  const getDetails = async (entities: Entity[]) => {
-    await batchAction(entities, getDetail)
-  }
-
-  const deleteEntity = async (entity: Entity) => {
-    await deleteEntities([entity])
-  }
-
-  const deleteEntities = async (entities: Entity[]) => {
-    await Promise.all([
-      _deleteDetails(entities),
-      _deleteBriefs(entities),
-    ])
-  }
-
-  const _addDetail = async (entity: Entity) => {
+  const setDetails = (entities: Entity[]) => {
     if (!detailCollection) {
       throw new Error(uninitializedError)
     }
-    const documentReference = await addDoc(detailCollection, entityToDetail(entity))
-    entity.id = documentReference.id
-    entityMap[entity.id] = entity
+    for (const entity of entities) {
+      if (entity.id) {
+        batch.set(doc(detailCollection, entity.id), entityToDetail(entity))
+        _updateEntityMap(entity.id, entity, detailKeys)
+      }
+    }
   }
 
-  const _addDetails = async (entities: Entity[]) => {
-    await batchAction(entities, _addDetail)
+  const setEntity = (entity: Entity) => {
+    setEntities([entity])
   }
 
-  const _deleteBriefs = async (entities: Entity[]) => {
+  const setEntities = (entities: Entity[]) => {
+    setDetails(entities)
+    setBriefs(entities)
+  }
+
+  const getDetail = async (entity: Entity) => {
+    await getDetails([entity])
+  }
+
+  const getDetails = async (entities: Entity[]) => {
+    if (!detailCollection) {
+      throw new Error(uninitializedError)
+    }
+    await Promise.all(entities.map(async (entity) => {
+      if (entity.id) {
+        const documentSnapshot = await getDoc(doc(detailCollection!, entity.id))
+        if (documentSnapshot.exists()) {
+          dataToDetail(documentSnapshot.data(), entity)
+        }
+      }
+    }))
+  }
+
+  const deleteEntity = (entity: Entity) => {
+    deleteEntities([entity])
+  }
+
+  const deleteEntities = (entities: Entity[]) => {
+    _deleteDetails(entities)
+    _deleteBriefs(entities)
+  }
+
+  const commit = async () => {
     if (!briefDocument) {
       throw new Error(uninitializedError)
     }
-    const updatedData: Record<string, FieldValue> = {}
+    batch.update(briefDocument, updatedData)
+    await batch.commit()
+    batch = writeBatch(db)
+    updatedData = {}
+  }
+
+  const _updateEntityMap = (id: string, entity: Entity, keys: (keyof Entity)[]) => {
+    const entityInMap = entityMap[id] || {
+      id: entity.id
+    }
+    for (const key of keys) {
+      entityInMap[key] = entity[key]
+    }
+    entityMap[id] = entityInMap
+  }
+
+  const _addDetails = (entities: Entity[]) => {
+    if (!detailCollection) {
+      throw new Error(uninitializedError)
+    }
+    for (const entity of entities) {
+      const newDetailRef = doc(detailCollection)
+      batch.set(newDetailRef, entityToDetail(entity))
+      entity.id = newDetailRef.id
+      entityMap[entity.id] = entity
+    }
+  }
+
+  const _deleteBriefs = (entities: Entity[]) => {
     for (const entity of entities) {
       if (entity.id) {
         updatedData[entity.id] = deleteField()
         delete entityMap[entity.id]
       }
     }
-    await updateDoc(briefDocument, updatedData)
   }
 
-  const _deleteDetail = async (entity: Entity) => {
-    if (!entity.id) {
-      return
+  const _deleteDetails = (entities: Entity[]) => {
+    if (!detailCollection) {
+      throw new Error(uninitializedError)
     }
-    await deleteDoc(getDetailDoc(entity.id))
-  }
-
-  const _deleteDetails = async (entities: Entity[]) => {
-    await batchAction(entities, _deleteDetail)
+    for (const entity of entities) {
+      entity.id && batch.delete(doc(detailCollection, entity.id))
+    }
   }
 
   const entities = computed(() => {
@@ -242,15 +228,12 @@ export const useElonStore = <Entity extends BaseEntity>(
     entityMap,
     briefDocument,
     detailCollection,
-    getDetailDoc,
-    updateEntityMap,
     entityToData,
     entityToBrief,
     entityToDetail,
     dataToEntity,
     dataToBrief,
     dataToDetail,
-    batchAction,
     init,
     addEntity,
     addEntities,
@@ -264,11 +247,11 @@ export const useElonStore = <Entity extends BaseEntity>(
     getDetails,
     deleteEntity,
     deleteEntities,
-    _addDetail,
+    commit,
+    entities,
+    _updateEntityMap,
     _addDetails,
     _deleteBriefs,
-    _deleteDetail,
     _deleteDetails,
-    entities,
   }
 }

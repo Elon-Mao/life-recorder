@@ -95,7 +95,8 @@ const readRecords = (recordsFile: File) => {
         endTime: columns[4],
       })
     })
-    await recordStore.setEntities(records)
+    recordStore.setEntities(records)
+    await recordStore.commit()
     systemStore.setLoading(false)
     showNotify({ type: 'success', message: 'Import Success' })
     importPopShow.value = false
@@ -119,7 +120,8 @@ const readLabels = (labelsFile: File, recordsFile: File) => {
         recordNum: Number(columns[2])
       })
     })
-    await labelStore.setEntities(labels)
+    labelStore.setEntities(labels)
+    await labelStore.commit()
     readRecords(recordsFile)
   }
   labelsReader.readAsText(labelsFile)
