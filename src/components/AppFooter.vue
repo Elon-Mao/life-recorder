@@ -15,7 +15,7 @@ const active = computed({
 </script>
 
 <template>
-  <van-tabbar v-model="active" :fixed="false">
+  <van-tabbar v-model="active">
     <van-tabbar-item name="Record" icon="records">Record</van-tabbar-item>
     <van-tabbar-item name="Label" icon="cluster">Label</van-tabbar-item>
     <van-tabbar-item name="Analysis" icon="chart-trending-o">Analysis</van-tabbar-item>

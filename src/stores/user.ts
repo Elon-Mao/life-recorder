@@ -18,23 +18,20 @@ export const useUserStore = defineStore('user', {
   },
   actions: {
     async setUser(user: User | null) {
-      const success = () => {
-        this.user = user
-        useSystemStore().setLoading(false)
-      }
-
       if (!user) {
         localStorage.removeItem('user')
         router.push({ name: 'Portal'})
-        success()
+        this.user = user
+        useSystemStore().setLoading(false)
         return
       }
 
       localStorage.setItem('user', JSON.stringify(user))
       router.push({ name: 'Home'})
+      this.user = user
       await useLabelStore().init(this.getAppCollection())
       await useRecordStore().init(this.getAppCollection())
-      success()
+      useSystemStore().setLoading(false)
     },
     getAppCollection() {
       return collection(db, `users/${this.user.uid}/${appName}`)

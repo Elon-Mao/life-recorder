@@ -139,7 +139,7 @@ const confirmImport = async () => {
 </script>
 
 <template>
-  <van-nav-bar :title="route.meta.title">
+  <van-nav-bar :title="route.meta.title" :fixed="true">
     <template #right>
       <van-popover v-model:show="userPopShow" placement="bottom-end">
         <div class="user-pop">

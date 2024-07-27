@@ -2,7 +2,7 @@
 </script>
 
 <template>
-  <h1>Portal</h1>
+  <h1 style="padding: var(--van-nav-bar-height) 0 0 0;">Portal</h1>
 </template>
 
 <style scoped>

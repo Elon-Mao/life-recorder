@@ -15,6 +15,7 @@ import AppFooter from '@/components/AppFooter.vue'
 
 <style scoped>
 .app-main {
+  padding: var(--van-nav-bar-height) 0 var(--van-tabbar-height) 0;
   flex-grow: 1;
   height: 0;
 }

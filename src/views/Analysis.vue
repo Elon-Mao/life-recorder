@@ -11,7 +11,6 @@ import { useRecordStore } from '@/stores/recordData'
 import { calculateSpan } from '@/common/convertToRecord'
 import RecordForm from '@/types/RecordForm'
 import { dayMills, getFormatDate } from '@/common/dateTools'
-import { CallbackDataParams } from 'echarts/types/dist/shared.js'
 
 const route = useRoute()
 const labelStore = useLabelStore()
@@ -154,7 +153,7 @@ const loadMultiChart = () => {
         barWidth: '80%',
         label: {
           show: true,
-          formatter: (params: CallbackDataParams) => {
+          formatter: (params: echarts.DefaultLabelFormatterCallbackParams) => {
             const spanDate = params.value as spanData
             if (spanDate.length) {
               return `${spanDate[1]}min\n${Math.round(spanDate[1]! * 1000 / dateSums[params.dataIndex]) / 10}%`
