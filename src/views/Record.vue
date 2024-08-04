@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import {
   NavBar as VanNavBar,
   Calendar as VanCalendar,
@@ -187,6 +187,10 @@ const onRecordConfirm = async () => {
   showNotify({ type: 'success', message: 'Add Success' })
 }
 
+const onGroupConfirm = () => {
+  nextTick(() => onRecordConfirm())
+}
+
 const addRecordDate = (addNum: number) => {
   const newDate = new Date(recordsDate.value)
   newDate.setDate(newDate.getDate() + addNum)
@@ -279,7 +283,7 @@ if (recordStore.entities.length) {
   <van-action-sheet v-model:show="showAction" :actions="actions" @select="onActionSelect" />
   <van-popup v-model:show="showPickerGroup" position="bottom" :close-on-click-overlay="false">
     <van-picker-group :tabs="pickerTabs" v-model:active-tab="activeTab" @cancel="showPickerGroup = false"
-      @confirm="onRecordConfirm">
+      @confirm="onGroupConfirm">
       <template #title v-if="!editingRecord.id">
         <van-radio-group v-model="addMode" direction="horizontal" class="add-mode-wrapper">
           <van-radio name="start now">start now</van-radio>
