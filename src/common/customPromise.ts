@@ -17,7 +17,7 @@ export default async <T>(promise: Promise<T>) => {
   try {
     return await Promise.race<T>([
       promise,
-      timeoutPromise(8000) as Promise<T>
+      timeoutPromise(300000) as Promise<T>
     ])
   } catch (error) {
     if (error instanceof Error) {
