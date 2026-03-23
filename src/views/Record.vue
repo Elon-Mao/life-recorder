@@ -230,11 +230,11 @@ const onDateChange = async () => {
   await getRecordsByDate()
 }
 
-if (recordStore.entities.length) {
+if (recordStore.isInitialized) {
   onDateChange()
 } else {
-  const recordsWatch = watch(() => recordStore.entities, () => {
-    if (recordStore.entities.length) {
+  const recordsWatch = watch(() => recordStore.isInitialized, () => {
+    if (recordStore.isInitialized) {
       onDateChange()
       recordsWatch()
     }

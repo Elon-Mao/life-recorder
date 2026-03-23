@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import {
   writeBatch,
   collection,
@@ -47,6 +47,7 @@ interface YearStore {
 }
 
 export const useRecordStore = defineStore(storeId, () => {
+  let isInitialized = ref(false)
   let collectionReference: CollectionReference | undefined
   const yearStoreMap = reactive<Record<string, YearStore>>({})
 
@@ -260,6 +261,7 @@ export const useRecordStore = defineStore(storeId, () => {
   const init = async (ref: CollectionReference) => {
     collectionReference = ref
     await Promise.all(recordYears.map((year) => initYearStore(year)))
+    isInitialized.value = true
   }
 
   const entities = computed(() => {
@@ -331,6 +333,7 @@ export const useRecordStore = defineStore(storeId, () => {
   }
 
   return {
+    isInitialized,
     init,
     entities,
     setEntities,
