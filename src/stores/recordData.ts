@@ -32,6 +32,10 @@ const uninitializedError = 'Record store is uninitialized'
 const briefKeys: (keyof RecordData)[] = ['labelId', 'date', 'startTime', 'endTime']
 const detailKeys: (keyof RecordData)[] = ['remark']
 
+const indexedDBName = `${storeId}_indexed_db`
+const indexedDBVersion = 1
+const indexedDBBriefStoreName = 'briefs'
+
 const recordYears = Array.from(
   { length: new Date().getFullYear() - 2024 + 1 },
   (_, i) => String(2024 + i),
@@ -99,6 +103,125 @@ export const useRecordStore = defineStore(storeId, () => {
   }
 
   const getYearStoreId = (year: string) => `${storeId}_${year}`
+
+  const openIndexedDB = () => {
+    return new Promise<IDBDatabase>((resolve, reject) => {
+      const request = window.indexedDB.open(indexedDBName, indexedDBVersion)
+
+      request.onupgradeneeded = () => {
+        const database = request.result
+        if (!database.objectStoreNames.contains(indexedDBBriefStoreName)) {
+          database.createObjectStore(indexedDBBriefStoreName)
+        }
+      }
+
+      request.onsuccess = () => {
+        resolve(request.result)
+      }
+
+      request.onerror = () => {
+        reject(request.error)
+      }
+    })
+  }
+
+  const getBriefFromIndexedDB = async (year: string) => {
+    const database = await openIndexedDB()
+
+    return new Promise<Record<string, DocumentData> | undefined>((resolve, reject) => {
+      const transaction = database.transaction(indexedDBBriefStoreName, 'readonly')
+      const objectStore = transaction.objectStore(indexedDBBriefStoreName)
+      const request = objectStore.get(getYearStoreId(year))
+
+      request.onsuccess = () => {
+        resolve(request.result)
+      }
+
+      request.onerror = () => {
+        reject(request.error)
+      }
+
+      transaction.oncomplete = () => {
+        database.close()
+      }
+
+      transaction.onerror = () => {
+        database.close()
+      }
+
+      transaction.onabort = () => {
+        database.close()
+      }
+    })
+  }
+
+  const setBriefToIndexedDB = async (year: string, briefDataMap: Record<string, DocumentData>) => {
+    const database = await openIndexedDB()
+
+    return new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(indexedDBBriefStoreName, 'readwrite')
+      const objectStore = transaction.objectStore(indexedDBBriefStoreName)
+
+      objectStore.put(briefDataMap, getYearStoreId(year))
+
+      transaction.oncomplete = () => {
+        database.close()
+        resolve()
+      }
+
+      transaction.onerror = () => {
+        database.close()
+        reject(transaction.error)
+      }
+
+      transaction.onabort = () => {
+        database.close()
+        reject(transaction.error)
+      }
+    })
+  }
+
+  const clearEntityMap = (store: YearStore) => {
+    Object.keys(store.entityMap).forEach((id) => {
+      delete store.entityMap[id]
+    })
+  }
+
+  const loadBriefDataMapToEntityMap = (store: YearStore, briefDataMap: Record<string, DocumentData>) => {
+    clearEntityMap(store)
+
+    for (const [id, documentData] of Object.entries(briefDataMap)) {
+      store.entityMap[id] = { id }
+      dataToBrief(documentData, store.entityMap[id])
+    }
+  }
+
+  const entityMapToBriefDataMap = (entityMap: Record<string, RecordData>) => {
+    const briefDataMap: Record<string, RecordData> = {}
+
+    for (const [id, entity] of Object.entries(entityMap)) {
+      briefDataMap[id] = entityToBrief(entity)
+    }
+
+    return briefDataMap
+  }
+
+  const safeGetBriefFromIndexedDB = async (year: string) => {
+    try {
+      return await getBriefFromIndexedDB(year)
+    } catch (error) {
+      console.warn(`Failed to read brief cache from IndexedDB: ${year}`, error)
+      return undefined
+    }
+  }
+
+  const safeSetBriefToIndexedDB = async (year: string, briefDataMap: Record<string, DocumentData>) => {
+    try {
+      await setBriefToIndexedDB(year, briefDataMap)
+    } catch (error) {
+      console.warn(`Failed to write brief cache to IndexedDB: ${year}`, error)
+    }
+  }
 
   const getOrCreateYearStore = (year: string) => {
     if (!yearStoreMap[year]) {
@@ -241,20 +364,24 @@ export const useRecordStore = defineStore(storeId, () => {
     store.briefDocument = doc(collectionReference, getYearStoreId(year))
     store.detailCollection = collection(collectionReference, getYearStoreId(year), 'details')
 
+    const cachedBriefDataMap = await safeGetBriefFromIndexedDB(year)
+
+    if (cachedBriefDataMap) {
+      loadBriefDataMapToEntityMap(store, cachedBriefDataMap)
+      return
+    }
+
     const documentSnapshot = await getDoc(store.briefDocument)
 
-    Object.keys(store.entityMap).forEach((id) => {
-      delete store.entityMap[id]
-    })
+    clearEntityMap(store)
 
     if (documentSnapshot.exists()) {
       const documentDataMap = documentSnapshot.data()
-      for (const [id, documentData] of Object.entries(documentDataMap)) {
-        store.entityMap[id] = { id }
-        dataToBrief(documentData, store.entityMap[id])
-      }
+      loadBriefDataMapToEntityMap(store, documentDataMap)
+      await safeSetBriefToIndexedDB(year, documentDataMap)
     } else {
       await setDoc(store.briefDocument, {})
+      await safeSetBriefToIndexedDB(year, {})
     }
   }
 
@@ -296,8 +423,12 @@ export const useRecordStore = defineStore(storeId, () => {
       if (Object.keys(store.updatedData).length === 0) {
         continue
       }
+
       store.batch.update(store.briefDocument, store.updatedData)
       await store.batch.commit()
+
+      await safeSetBriefToIndexedDB(store.year, entityMapToBriefDataMap(store.entityMap))
+
       store.batch = writeBatch(db)
       store.updatedData = {}
     }
